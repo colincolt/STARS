@@ -15,3 +15,5 @@ This is BETA only so far.
 Everything has worked earlier, send, receive, including two RF24 on one host, and including RPI, virtual-GPIO and regular arduino sketch, all talking to each other.
 
 But recent testing has been only LIBRARY plus "example-nrf24-pair.py" on virtual-GPIO, so other parts are yet to be re-verified. 
+Unrelated - this is a url I am hoping to use later:
+https://www.raspberrypi.org/magpi/connecting-disks-with-the-command-line/
