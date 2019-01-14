@@ -85,14 +85,19 @@ def Stereo():
     TCP_IP = '192.168.137.200'
     TCP_PORT = 5005
     BUFFER_SIZE = 20
-
-
+    NO_TALK=True
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((TCP_IP, TCP_PORT))
-    s.listen(1)
-    conn, addr = s.accept()
 
+    while NO_TALK == True:
+        try:
+            s.bind((TCP_IP, TCP_PORT))
+            s.listen(1)
+            conn, addr = s.accept()
+        except:
+            print('No Client')
+            time.sleep(5)
+            continue
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-v", "--video",
