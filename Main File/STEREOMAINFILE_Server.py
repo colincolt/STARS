@@ -1,78 +1,102 @@
-# import Stereo packages
+# _________________________________READ ME______________________________________#
+# THREADING:
+# This file uses the python "threading" module to run any number of "Threads"
+# simultaneously, anything that needs to run continuously can be put into an
+# infinite loop, anything that needs to run independantly and not interfere
+# with other tasks. THREADS are ideal for input output operations, we do not
+# have a lot of math being done.
+#
+# QUEUE:
+# Notice the use of Queues to input output data to and from threads, read the
+# documentation to get a better understanding (https://docs.python.org/3/library/asyncio-queue.html)
+#
+# BASIC PROGRAM STRUCTURE:
+# for now at least the way that this is structured has the Stereoscopic code
+# run in the main thread/program, this means LIMIT any code outside of the
+# threads, otherwise the FPS of the algorithm is compromised
+
+# PROGRAM OPTIONS:
+Show_Video_Feed = True
+Print_FPS = False
+
+# Stereo packages
 from collections import deque
 from imutils.video import VideoStream
 import numpy as np
 import argparse
 import cv2
 import imutils
-import signal
 import time
 import socket
-import struct
-import math
-
-# import Main packages
+# import struct
+# import math
+# import signal
 from threading import *
 from multiprocessing import Queue
 
-## Variables/Queues
-#distance_req = queue.Queue()
+# # _______________________________Variables/Queues____________________________________
 data_class_yaw_pitch = Queue()
 data_launch = Queue()
+class StereoOutput:
+    pass
 
-##_________________THREADS__________________________________###
-class Pitch_Yaw(Thread):        ##Also gathers data from Distance sensors
+# #____________________________________THREADS__________________________________###
+
+# PITCH_YAW_THREAD: communicates to the Arduino Uno in order to provide angle
+# values to both motors, request temperature's from the Uno, and distance measurements
+# from the Arduino Mega or Serial.
+# These distance measurements are also provided to the LAUNCHER THREAD
+
+class Pitch_Yaw(Thread):
     def __init__(self, data):
-      Thread.__init__(self)
-      self.req_q = data
+        Thread.__init__(self)
+        self.req_q = data
 
     def run(self):
         print('Starting Pitch Yaw thread')
         while True:
             try:
                 print('in the pitch_yaw try')
-                data = data_class_yaw_pitch.get() #get_nowait to test exception
-                #print(data.distance)
-                #print(data.disparity)
-                ##DOES SOME MATH to get a reliable distance
-                FINAL_DIST = distance
+                data = data_class_yaw_pitch.get() # get_nowait to test exception
+                # print(data.distance)
+                # print(data.disparity)
+                # #DOES SOME MATH to get a reliable distance
+                FINAL_DIST = data.distance
                 data_launch.put(FINAL_DIST)
             except :
                 print('in the pitch_yaw except')
                 continue
 
+# LAUNCHER_THREAD: Listens to Voice commands, controls launcher, Ball feeder, and Main data processing
 
-class Launcher(Thread):         ## Listens to Voice command, controls launcher, Ball feeder, and Main data processing
+class Launcher(Thread):
     def __init__(self, datas):
-      Thread.__init__(self)
-      self.req_q = datas
+        Thread.__init__(self)
+        self.req_q = datas
 
     def run(self):
         print('Starting Launcher thread')
         while True:
             try:
                 print('in the launcher try')
-                datas = data_launch.get() #get_nowait to test exception
+                datas = data_launch.get() # get_nowait to test exception
                 print(datas)
-            except :
+            except:
                 print('in the launcher except')
                 continue
 
-#Start Threads
+# Start Threads
 myThread1 = Pitch_Yaw(data_class_yaw_pitch)
 myThread1.start()
 myThread2 = Launcher(data_launch)
 myThread2.start()
 
 
-###_________________Main_File_Startup_Stuff_____________###
-#def startup():
+def stereoscopics():
+    # ##_________________STEREO_STARTUP_STUFF_______________#####
 
-def Stereo():
-      ###_________________STEREO_STARTUP_STUFF_______________#####
-    ##  subprocess.call(["source", "~/.profile"])
-    ##  subprocess.call(["workon", "cv"])
-    ##  subprocess.call(["sudo", "modprobe", "bcm2835-v4l2"])
+    # #  subprocess.call(["source", "~/.profile"])
+    # #  subprocess.call(["workon", "cv"])
 
     focalsize = 3.04e-03
     pixelsize = 1.12e-06
@@ -85,19 +109,22 @@ def Stereo():
     TCP_IP = '192.168.137.200'
     TCP_PORT = 5005
     BUFFER_SIZE = 20
-    NO_TALK=True
+    no_talk=True
 
+# ##________________Sockets TCP/IP Communication__________________________________###########
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    while NO_TALK == True:
+    while no_talk == True:      # Wait for client
         try:
             s.bind((TCP_IP, TCP_PORT))
             s.listen(1)
             conn, addr = s.accept()
+            no_talk = False
         except:
-            print('No Client')
+            print('Stereoscopics:       No Client')
             time.sleep(5)
             continue
+
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-v", "--video",
@@ -173,24 +200,22 @@ def Stereo():
 
         # only proceed if at least one contour was found
         if len(cnts) > 0:
-                # find the largest contour in the mask, then use
-                # it to compute the minimum enclosing circle and
-                # centroid
-                c = max(cnts, key=cv2.contourArea)
-                ((x, y), radius) = cv2.minEnclosingCircle(c)
-                M = cv2.moments(c)
-                center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-    ##		print("Center: " + center[0])
-                centroid = (round((M["m10"] / M["m00"]),3), round((M["m01"] / M["m00"]),3))
-                centroid = (centroid[0]*2464/600, centroid[1]*2464/600)
-    ##		print("Centroid: " + str(centroid[0]))
+            # find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            # print("Center: " + center[0])
+            centroid = (round((M["m10"] / M["m00"]),3), round((M["m01"] / M["m00"]),3))
+            centroid = (centroid[0]*2464/600, centroid[1]*2464/600)
+            # print("Centroid: " + str(centroid[0]))
 
-                # only proceed if the radius meets a minimum size
-                if radius > 0.1:
-                        # draw the circle and centroid on the frame,
-                        # then update the list of tracked points
-                        cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-                        cv2.circle(frame, center, 5, (0, 0, 255), -1)
+            # only proceed if the radius meets a minimum size
+            if radius > 0.1:
+                # draw the circle and centroid on the frame,
+                # then update the list of tracked points
+                cv2.circle(frame, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                cv2.circle(frame, center, 5, (0, 0, 255), -1)
 
         # update the points queue
         pts.appendleft(center)
@@ -209,66 +234,51 @@ def Stereo():
                 cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
 
         while 1:
-              data = conn.recv(BUFFER_SIZE)
-              if not data: break
-              # print ("received data:", data)
-              conn.send(data) #echo
-              compvalue = data.decode()
-              break
+            data = conn.recv(BUFFER_SIZE)
+            if not data: break
+            # print ("received data:", data)
+            conn.send(data) #echo
+            compvalue = data.decode()
+            break
 
         if len(cnts) > 0:
-              #print("Decoded value: " + compvalue)
-              slaveval = float(compvalue)
-              masterval = centroid[0]
-    ##            print("Master and slave vals determined")
-    ##	      masterval = x*2464/600
-              class StereoOutput:
-                 pass
-              results = StereoOutput()
-    ##            disparity = abs(float(compvalue)-centroid[0])
-              disparity = abs(masterval-slaveval)
-    ##            print("Disparity: " + str(disparity))
-              distance = (focalsize*baseline)/(disparity*pixelsize)
-            ##SENDS DATA TO Class, which is returned to main file outside of function______________________________________
-              results.distance = distance
-              results.disparity=disparity
-              data_class_yaw_pitch.put(results)
-              ###_______________________________________________
-              distvals.append(distance)
-              length = len(distvals)
-              sumweights = 0
-              weight = 0
-              denominator = 0
-              if length < datapoints:
-                  average = sum(distvals)/len(distvals)
-              if length > datapoints:
-                  distvals.pop(0)
-                  for i in range(0, datapoints-1):
-                      weight = ((i+1)*distvals[i])
-                      sumweights = sumweights + weight
-                  for j in range(1, datapoints):
-                      denominator = denominator + j
-                  average = sumweights/denominator
-    ##            print("Average: " + str(average))
+            #print("Decoded value: " + compvalue)
+            slaveval = float(compvalue)
+            masterval = centroid[0]
+            # masterval = x*2464/600
+            results = StereoOutput()
+            # disparity = abs(float(compvalue)-centroid[0])
+            disparity = abs(masterval-slaveval)
+            distance = (focalsize*baseline)/(disparity*pixelsize)
+            # SENDS DATA TO Class, which can be "Put" using Queue's______________________________
+            results.distance = distance
+            results.disparity = disparity
+            data_class_yaw_pitch.put(results)
+            # ##_______________________________________________
+            distvals.append(distance)
+            length = len(distvals)
+            sumweights = 0
+            weight = 0
+            denominator = 0
+            if length < datapoints:
+                average = sum(distvals)/len(distvals)
+            if length > datapoints:
+                distvals.pop(0)
+                for i in range(0, datapoints-1):
+                    weight = ((i+1)*distvals[i])
+                    sumweights = sumweights + weight
+                for j in range(1, datapoints):
+                    denominator = denominator + j
+                average = sumweights/denominator
 
           # average = sum(distvals)/len(distvals)
           # show the frame to our screen
-        # hypotenuse = ((center[0])**(2) + (center[1])**(2))**(0.5)
-              cv2.putText(frame, "Center: " + str(center), (50,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
-        # cv2.putText(frame, "Hypotenuse : " + str(int(hypotenuse)), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
-              cv2.putText(frame, "Radius: " + str(int(radius)), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
-        #average = sum(distvals)/len(distvals)
-              cv2.putText(frame, "Distance: " + str(round(average,2)), (50,150), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
-    ##            print("Values displayed on screen")
+            cv2.putText(frame, "Center: " + str(center), (50,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
+            cv2.putText(frame, "Radius: " + str(int(radius)), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
+            cv2.putText(frame, "Distance: " + str(round(average,2)), (50,150), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2)
 
-        cv2.imshow("Frame", frame)
-        key = cv2.waitKey(1) & 0xFF
-        end = time.time()
-        print(end-start)
-
-        # if the 'q' key is pressed, stop the loop
-        if key == ord("q"):
-              break
+        if Show_Video_Feed is True:
+            cv2.imshow("Frame", frame)
 
     # if we are not using a video file, stop the camera video stream
     if not args.get("video", False):
@@ -278,9 +288,14 @@ def Stereo():
     else:
         vs.release()
 
+    if Print_FPS is True:
+        end = time.time()
+        print(end-start)
+
     # close all windows
     cv2.destroyAllWindows()
     conn.close()
 
-Stereo()
-###_________________!!Nothing will run past here_____!!!____!!!___!!!___#####
+# ##________________Beginning of MAIN FILE_____()
+
+stereoscopics()    # ##_________________!!Nothing will run past here_____!!!____!!!___!!!___#####
