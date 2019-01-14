@@ -20,7 +20,7 @@ from multiprocessing import Queue
 data_class_yaw_pitch = Queue()
 data_class_launch = Queue()
 
-class Pitch_Yaw(Thread):
+class Pitch_Yaw(Thread):        ##Also gathers data from Distance sensors
     def __init__(self, data):
       Thread.__init__(self)
       self.req_q = data
@@ -29,16 +29,19 @@ class Pitch_Yaw(Thread):
         print('Starting Pitch Yaw thread')
         while True:
             try:
-                print('in the try')
+                print('in the pitch_yaw try')
                 data = data_class_yaw_pitch.get() #get_nowait to test exception
-                print(data.distance)
-                print(data.disparity)
+                #print(data.distance)
+                #print(data.disparity)
+                ##DOES SOME MATH to get a reliable distance
+                FINAL_DIST = distance
+                data_class_launch.put(FINAL_DIST)
             except :
-                print('in the except')
+                print('in the pitch_yaw except')
                 continue
-                
 
-class Launcher(Thread):
+
+class Launcher(Thread):         ## Listens to Voice command, controls launcher, Ball feeder, and Main data processing
     def __init__(self, datas):
       Thread.__init__(self)
       self.req_q = datas
@@ -47,19 +50,20 @@ class Launcher(Thread):
         print('Starting Launcher thread')
         while True:
             try:
-                print('in the try')
+                print('in the launcher try')
                 datas = data_class_launch.get() #get_nowait to test exception
-                print(datas.distance)
-                print(datas.disparity)
+                print(datas)
             except :
-                print('in the except')
+                print('in the launcher except')
                 continue
 
 
 ##MAIN CODE##
 #Start Thread
-myThread = Pitch_Yaw(data_class_yaw_pitch) 
-myThread.start()
+myThread1 = Pitch_Yaw(data_class_yaw_pitch)
+myThread1.start()
+myThread2 = Pitch_Yaw(data_class_yaw_pitch)
+myThread2.start()
 
 
 ###_________________Main_File_Startup_Stuff_____________###
