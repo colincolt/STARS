@@ -1,3 +1,7 @@
+from guizero import App, Text, PushButton, Window, Slider, Picture
+#from tkinter import *
+#import RPi.GPIO as GPIO
+
 def drill_1_selection():
     second_message.value = "Target Drill Selected"
 
@@ -88,10 +92,6 @@ def powerON():
     else:
         GPIO.output(40,GPIO.HIGH)
         start_1["text"] = "Pause"
-
-from guizero import App, Text, PushButton, Window, Slider, Picture
-#from tkinter import *
-#import RPi.GPIO as GPIO
 
 app = App(title="S.T.A.R.S. User Interface")
 
