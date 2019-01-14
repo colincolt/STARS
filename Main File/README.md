@@ -1,4 +1,4 @@
-# Project Title
+# S.T.A.R.S App
 
 Main Program on the Server
 
