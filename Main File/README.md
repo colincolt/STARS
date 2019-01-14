@@ -27,6 +27,9 @@ Step 3: Might have to "pip install imutils" and maybe "multithreading" if not pr
 
 ## Deployment
 
+Threading relies heavily on the use communication channels such as "Queue's" in order to pass information, this because obviously Threads cannot share data and variable directly, this would cause a mess, therefore we must use Queue: https://docs.python.org/3/library/asyncio-queue.html or something like "Sockets" to create a web server and port number to transfer data between threads.
+
+For more info on Threading: https://docs.python.org/3/library/threading.html
 
 
 ## Built With
