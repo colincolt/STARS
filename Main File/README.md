@@ -2,7 +2,7 @@
 
 Main Program on the Server
 
-![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Pseudo.png)
+![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/PseudoCode.png)
 
 ## Getting Started
 
