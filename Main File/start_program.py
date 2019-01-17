@@ -73,19 +73,19 @@ class Stack:
 # These distance measurements are also provided to the LAUNCHER THREAD
 
 class PitchYaw(Thread):
-    def __init__(self, getAngleStack, getDistanceStack):
+    def __init__(self, getStereoStack, getDistanceStack):
         Thread.__init__(self)
-        self.getAngleStack = getAngleStack
+        self.getStereoStack = getStereoStack
         self.getDistanceStack = getDistanceStack
+        self.getleftXStack = getleftXStack
 
     def run(self):
         print('Starting Pitch Yaw thread')
         while True:
             try:
-                Angle = self.getAngleStack.peek()
+                leftXcoord = self.getStereoStack.masterval.peek()
+                rightXcoord = self.getStereoStack.slaveval.peek()
                 distance = self.getDistanceStack.peek()
-                leftXcoord = self.
-                rightXcoord = 
 
                 # TODO: insert MATH to get reliable distance then use distance with pitch motor
 
@@ -96,11 +96,11 @@ class PitchYaw(Thread):
 
 ## Sterepscopic thread
 class Stereoscopics(Thread):
-    def __init__(self, difficulty, drillType, args, sendAngleStack):
+    def __init__(self, difficulty, drillType, args, sendStereoStack):
         Thread.__init__(self)
         self.difficulty = difficulty
         self.drillType = drillType
-        self.sendAngleStack = sendAngleStack
+        self.sendStereoStack = sendStereoStack
         self.args = args
 
     def run(self):
@@ -262,7 +262,7 @@ class Stereoscopics(Thread):
                 results.disparity = disparity
                 results.masterval = masterval
                 results.slaveval = slaveval
-                self.sendAngleStack.push(results)
+                self.sendStereoStack.push(results)
                 # ##_______________________________________________
                 distvals.append(distance)
                 length = len(distvals)
@@ -340,12 +340,9 @@ def startMainFile(speed, difficulty, drillType, args): ## NOT A THREAD, performs
     # args = vars(ap.parse_args())
 
     # # _______________________________Main Processing_____________________________________# #
-    AngleStack = Stack()
+    StereoStack = Stack()
     distanceStack = Stack()
-    voiceCommandStack = Stack()
-    # Arduino Mega Port:
-    Mega=serial.Serial("/dev/ttyUSB1",115200)        #Arduino Mega
-    Mega.baudrate=115200
+    voiceCommandStack = Stack
     # Terabee Rangefinder Port:
     evo = serial.Serial(portname, baudrate=115200, timeout=2)   ##MANUALY INPUT the 'portname' /tty/.../
     set_text = (0x00, 0x11, 0x01, 0x45)
@@ -353,9 +350,9 @@ def startMainFile(speed, difficulty, drillType, args): ## NOT A THREAD, performs
     evo.write(set_text)
     evo.flushOutput()
     # Start Threads
-    pitchYawthread = PitchYaw(AngleStack, distanceStack)
+    pitchYawthread = PitchYaw(StereoStack, distanceStack)
     pitchYawthread.start()
-    stereoscopicsThread = Stereoscopics(difficulty, drillType, args, AngleStack)
+    stereoscopicsThread = Stereoscopics(difficulty, drillType, args, StereoStack)
     stereoscopicsThread.start()
     startLauncherThread = startLauncher(speed, voiceCommandStack, distanceStack)
     startLauncherThread.start()
