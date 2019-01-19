@@ -101,21 +101,27 @@ class Stack:
 
 # _______PITCH AND YAW CONTROL________ #
 class PitchYaw(Thread):
-    def __init__(self, getStereoStack, getDistanceStack, getguiStack):
+    def __init__(self, getstereoStack, getdistanceStack, getguiStack):
         Thread.__init__(self)
-        self.getStereoStack = getStereoStack
-        self.getDistanceStack = getDistanceStack
+        self.getstereoStack = getstereoStack
+        self.getdistanceStack = getdistanceStack
         self.getguiStack = getguiStack
 
     def run(self):
-        print('Starting Pitch Yaw thread')
         ser = serial.Serial("/dev/ttyACM0", 9600)  # change ACM number as found from "dmesg -s 1024"
         ser.baudrate = 9600
+##        print('Starting Pitch Yaw thread')
+##        try:
+##            
+##        except Exception as e:
+##            print('Pitch yaw thread failed because of exception ' + e)
+##            time.sleep(2)
+        
         while True:
             try:
-                distance = self.getDistanceStack.peek()
-                distance = self.getStereoStack.masterval.peek()
-                RightXcoord = self.getStereoStack.masterval.peek()
+                distance = self.getdistanceStack.peek()
+                distance = self.getstereoStack.distance.peek()
+                RightXcoord = self.getstereoStack.masterval.peek()
                 LeftXcoord = self.getStereoStack.slaveval.peek()
 
                 inequality = 2464 - LeftXcoord
@@ -208,9 +214,7 @@ class Stereoscopics(Thread):
         BUFFER_SIZE = 20
         no_talk = True
 
-        args = self.args
-
-        ##________________Sockets TCP/IP Communication__________________________________###########
+                ##________________Sockets TCP/IP Communication__________________________________###########
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         while no_talk == True:  # Wait for client
@@ -393,11 +397,11 @@ class Stereoscopics(Thread):
 # Connects and communicates with the Arduino Mega: Launcher Motors, Ball Feeder, Wifi, Accelerometer? (Rangefinder?)
 
 class Launcher(Thread):
-    def __init__(self, speed, sendVoiceCommandStack, sendDistanceStack):
+    def __init__(self, guiStack, sendVoiceCommandStack, sendDistanceStack):
         Thread.__init__(self)
         self.sendVoiceCommandStack = sendVoiceCommandStack
         self.sendDistanceStack = sendDistanceStack
-        self.speed = speed
+        self.guiStack = guiStack
 
     def run(self):
         currRestPos = ""
@@ -406,17 +410,19 @@ class Launcher(Thread):
         while True:
             try:
                 # newRestPos = getRestingPosition()
-                if newRestPos:
-                    currRestPos = newRestPos
-
+                # if newRestPos:
+                #    currRestPos = newRestPos
+                #
                 # newDistance = getDistance()
-                if newDistance:
-                    currDistance = newDistance
+                # if newDistance:
+                #    currDistance = newDistance
 
                 # TODO: do calculation and stuff
-                calc = ""
-                sendVoiceCommandStack.push(calc)
-                sendDistanceStack.push(self.currDistance)
+                # calc = ""
+                # sendVoiceCommandStack.push(calc)
+                # sendDistanceStack.push(self.currDistance)
+                print("In the Launcher Try")
+                time.sleep(5)
 
             except Exception as e:
                 print('Launcher thread failed because of exception ' + e)
@@ -437,7 +443,7 @@ def startMainFile(speed, difficulty, drilltype):   # , args): ## NOT A THREAD, p
     # # _______________________________Main Processing_____________________________________
     
     # Define Constants and Stacks --> Comm pipes
-    StereoStack = Stack()
+    stereoStack = Stack()
     distanceStack = Stack()
     guiStack = Stack()
     voiceCommandStack = Stack()
@@ -454,31 +460,31 @@ def startMainFile(speed, difficulty, drilltype):   # , args): ## NOT A THREAD, p
 
     guiStack.push(guiData)
 
-    stereoDistance = StereoStack.peek()
+    # stereoDistance = StereoStack.peek()
 
     #    Evo Rangefinder Port:
     a = True
-    while a == True:
-        try:
-            evo = Serial("/dev/ttyACM0", baudrate=115200, timeout=2)  ##MANUALY INPUT the 'portname' /tty/.../
-            set_text = (0x00, 0x11, 0x01, 0x45)
-            evo.flushInput()
-            evo.write(set_text)
-            evo.flushOutput()
-            a = False
-        except:
-            print('cant connect to Evo')
-            time.sleep(5)
-            continue
+##    while a == True:
+##        try:
+##            evo = Serial("/dev/ttyACM0", baudrate=115200, timeout=2)  ##MANUALY INPUT the 'portname' /tty/.../
+##            set_text = (0x00, 0x11, 0x01, 0x45)
+##            evo.flushInput()
+##            evo.write(set_text)
+##            evo.flushOutput()
+##            a = False
+##        except:
+##            print('cant connect to Evo')
+##            time.sleep(5)
+##            continue
     # Start Threads
 
-    stereoscopicsThread = Stereoscopics(drillDifficulty, drillType, StereoStack)
+    stereoscopicsThread = Stereoscopics(stereoStack)
     stereoscopicsThread.start()
 
-    pitchYawthread = PitchYaw(StereoStack, distanceStack)
+    pitchYawthread = PitchYaw(stereoStack, distanceStack, guiStack)
     pitchYawthread.start()
 
-    startLauncherThread = startLauncher(speed, voiceCommandStack, distanceStack)
+    startLauncherThread = Launcher(guiStack, voiceCommandStack, distanceStack)
     startLauncherThread.start()
 
 # ________ Run The Program ____________ #
