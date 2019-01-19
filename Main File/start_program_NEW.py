@@ -189,7 +189,7 @@ class PitchYaw(Thread):
 
 
 # __________ Sterepscopic Thread___________ #
-def StereoscopicsThread(conn):
+def StereoscopicsThread(conn, StereoOutput):
     print('Starting Stereoscopics thread')
     # subprocess.call(["source", "~/.profile"])
     # subprocess.call(["workon", "cv"])
@@ -200,25 +200,12 @@ def StereoscopicsThread(conn):
     centroid = (0, 0)
     compvalue = 1
 
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-v", "--video",
+                    help="path to the (optional) video file")
+    ap.add_argument("-b", "--buffer", type=int, default=8, help="max buffer size")
+    args = vars(ap.parse_args())
     ##________________Sockets TCP/IP Communication__________________________________###########
-
-    # TCP_IP = '192.168.137.200'
-    # TCP_PORT = 5005
-    # BUFFER_SIZE = 20
-    # no_talk = True
-    #
-    # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #
-    # while no_talk == True:  # Wait for client
-    #     try:
-    #         s.bind((TCP_IP, TCP_PORT))
-    #         s.listen(1)
-    #         conn, addr = s.accept()
-    #         no_talk = False
-    #     except:
-    #         print('Stereoscopics:       No Client')
-    #         time.sleep(5)
-    #         continue
 
     # define the lower and upper boundaries of the jersey
     # ball in the HSV color space, then initialize the
@@ -338,12 +325,13 @@ def StereoscopicsThread(conn):
             disparity = abs(masterval - slaveval)
             distance = (focalsize * baseline) / (disparity * pixelsize)
             # SENDS DATA TO Class, which can be "Put" using Queue's______________________________
-            results = StereoOutput()
+            print(distance)
+            results = StereoOutput
             results.distance = distance
             results.disparity = disparity
             results.masterval = masterval
             results.slaveval = slaveval
-            self.sendStereoStack.push(results)
+            stereoStack.push(results)
             # ##_______________________________________________
             distvals.append(distance)
             length = len(distvals)
@@ -471,8 +459,29 @@ def startMainFile(speed, difficulty, drilltype):  # , args): ## NOT A THREAD, pe
     ##            continue
     # Start Threads
 
-    stereoscopicsThread = Stereoscopics(stereoStack)
-    stereoscopicsThread.start()
+    # ___Begin Stereoscopic Thread:____ #
+    TCP_IP = '192.168.137.200'
+    TCP_PORT = 5005
+    BUFFER_SIZE = 20
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    no_talk = True
+    while no_talk == True:  # Wait for client
+        try:
+            s.bind((TCP_IP, TCP_PORT))
+            s.listen(1)
+            clientPort, addr = s.accept()
+            no_talk = False
+        except:
+            print('Stereoscopics:       No Client')
+            time.sleep(5)
+            continue
+
+    print("Client connected")
+    process = Thread(target=StereoscopicsThread, args=[clientPort, StereoOutput])
+    process.start()
+
+    time.sleep(5)
 
     pitchYawthread = PitchYaw(stereoStack, distanceStack, guiStack)
     pitchYawthread.start()
@@ -480,30 +489,6 @@ def startMainFile(speed, difficulty, drilltype):  # , args): ## NOT A THREAD, pe
     startLauncherThread = Launcher(guiStack, voiceCommandStack, distanceStack)
     startLauncherThread.start()
 
+
 # ________ Run The Program ____________ #
 # startMainFile(3,4,"manual")  # for testing purposes only
-
-
-stereoStack = Stack()
-ethernetPortStack = Stack()
-
-TCP_IP = '192.168.137.200'
-TCP_PORT = 5005
-BUFFER_SIZE = 20
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-no_talk = True
-while no_talk == True:  # Wait for client
-    try:
-        s.bind((TCP_IP, TCP_PORT))
-        s.listen(1)
-        clientPort, addr = s.accept()
-        no_talk = False
-    except:
-        print('Stereoscopics:       No Client')
-        time.sleep(5)
-        continue
-
-print("Client connected")
-process = Thread(target=StereoscopicsThread, args=[clientPort])
-process.start()
