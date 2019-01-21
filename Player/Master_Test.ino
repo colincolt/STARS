@@ -38,12 +38,13 @@ const byte nodeAddresses[5][5] = {
 };
 
 // integer to store count of successful transmissions
-//int masterSendCount = 0;
+int masterSendCount = 0;
 
 // simple integer array for data from each slave node: { node_id, returned_count }
-//int remoteNodeData[3][3] = {{1, 1}, {2, 1}, {3, 1}};
+int remoteNodeData[5][2] = {{1, 1}, {2, 1}, {3, 1}, {4, 1}, {5, 1}};
 
-float remoteNodeData[4];
+//float remoteNodeData[4];
+
 int   VR_Data;
 int   node;
 int   difficulty_setting;
@@ -87,21 +88,6 @@ void setup()
 }
 
 
-/* Function: loop
- *    main loop program for the master device - repeats continuously during operation
- */
-void loop()
-{
-    // ensure we dont collect data from nodes faster than selected rate
-    currentTime = millis();
-    while (currentTime - lastSentTime <= SEND_RATE) {}
-    
-    // collect sensor data from all nodes
-    receiveNodeData(node);
-    receiveVR_Data();
-    
-    lastSentTime = millis();
-}
 
 
 /* Function: receiveNodeData
@@ -151,7 +137,7 @@ void receiveNodeData(int node)
         else {
             Serial.print("[-] The transmission to the selected node failed.");
         }
-    }
+    
     Serial.println("--------------------------------------------------------");
 }
 
@@ -194,7 +180,7 @@ void receiveVR_Data()
         else {
             Serial.print("[-] The transmission to the selected node failed.");
         }
-    }
+    
     Serial.println("--------------------------------------------------------");  
 }
 
@@ -244,7 +230,27 @@ void InitializeDrill(int node)
         else {
             Serial.print("[-] The transmission to the selected node failed.");
         }
-    }
+    
     Serial.println("--------------------------------------------------------");
  
+}
+
+
+
+
+
+/* Function: loop
+ *    main loop program for the master device - repeats continuously during operation
+ */
+void loop()
+{
+    // ensure we dont collect data from nodes faster than selected rate
+    currentTime = millis();
+    while (currentTime - lastSentTime <= SEND_RATE) {}
+    
+    // collect sensor data from all nodes
+//    receiveNodeData(node);
+    receiveVR_Data();
+    
+    lastSentTime = millis();
 }
