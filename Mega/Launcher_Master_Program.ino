@@ -80,22 +80,22 @@ int data_receive = 0;
 
 int Motor1_Speed = 0;
 int Motor2_Speed = 0;
+int Target_Number = 0;
+int Difficulty = 0;
 
 int Controlled = 0;
 
 //==================================================================//
-// ------------------------ GLOBAL CONSTANTS ------------------------- // 
 
 int Initialize = 0;
 
 unsigned long start_time;
 
-/* INITIALIZE DATA BEING SEND TO PI (so we always have something to send)
-/ motor_speeds = int(0)
-/ temp = int(0)
-/ target_timing = float(0.0) or int() in micros
-/ ball_speed = float(meters/s)
-/ vr_command = int(1, 2, 3, 4, or 5) 
+
+
+
+
+
 
 
 
@@ -138,7 +138,7 @@ void setup() {
 
     Serial.begin(9600);
     Serial.println("This demo expects 2 pieces of data - Motor 1 Speed, Motor 2 Speed");
-    Serial.println("Enter data in this style <2000,3000>  ");
+    Serial.println("Enter data in this style <2000,3000,1,5>  ");
     Serial.println();
 
 
@@ -156,28 +156,63 @@ void setup() {
 
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
+
+  
+
+
+
+
 }
 
+  
+
 //==================================================================//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void loop() {
   // put your main code here, to run repeatedly:
   
-if (Initialize == 0){
+if (Initialize == 0)
+{
  getTemp();
  Initialize = 1; 
 }
 
-else{
-LIDAR();
+else
+{
+//LIDAR();
 Serial_Input(); 
 
-if (data_receive == 1){
-  if (Controlled == 0){
+if (data_receive == 1)
+{
+  if (Controlled == 0)
+ {
   Motor_Control();
  }
- else if ((millis() - start_time) > 5000){
+ else if ((millis() - start_time) > 5000)
+ {
+  
   simple_FeedBall();
+  Serial.print("Ball Fed\n");
   Motor1_Speed = 0;
   Motor2_Speed = 0;
   Motor_Control();
@@ -186,7 +221,8 @@ if (data_receive == 1){
   data_receive = 0;
   Controlled = 0; 
  }
- else{}
+ else
+ {}
  
 }
 }
@@ -223,7 +259,8 @@ float getTemp()
   Celcius = sensors.getTempCByIndex(0);
 //  Fahrenheit = sensors.toFahrenheit(Celcius);
   Serial.print(Celcius);
-  Serial.println(" C");
+//  Serial.write(Celcius);
+//  Serial.println(" C");
 
 //  Serial.print(" F  ");
 //  Serial.println(Fahrenheit);
@@ -362,6 +399,11 @@ void parseData() {      // split the data into its parts
     strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
     Motor2_Speed = atoi(strtokIndx);     // convert this part to an integer
 
+    strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
+    Target_Number = atoi(strtokIndx);     // convert this part to an integer
+
+    strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
+    Difficulty = atoi(strtokIndx);     // convert this part to an integer
 }
 
 //============
@@ -371,6 +413,10 @@ void showParsedData() {
     Serial.println(Motor1_Speed);
     Serial.print("Motor 2 Speed = ");
     Serial.println(Motor2_Speed);
+    Serial.print("Target Number = ");
+    Serial.println(Target_Number);
+    Serial.print("Difficulty = ");
+    Serial.println(Difficulty);
 }
 
 
