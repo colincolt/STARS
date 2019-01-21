@@ -148,10 +148,10 @@ void receiveVR_Data()
         // setup a write pipe to current sensor node - must match the remote node listening pipe
         radio.openWritingPipe(nodeAddresses[4]);
         
-        Serial.print("[*] Attempting to transmit data to node ");
-        Serial.println(node + 1);
-        Serial.print("[*] The master unit count being sent is: ");
-        Serial.println(masterSendCount);
+ //       Serial.print("[*] Attempting to transmit data to node ");
+ //       Serial.println(node + 1);
+ //       Serial.print("[*] The master unit count being sent is: ");
+ //       Serial.println(masterSendCount);
         
         // boolean to indicate if radio.write() tx was successful
         bool tx_sent;
@@ -246,11 +246,19 @@ void loop()
 {
     // ensure we dont collect data from nodes faster than selected rate
     currentTime = millis();
-    while (currentTime - lastSentTime <= SEND_RATE) {}
+    
+//    while (currentTime - lastSentTime >= SEND_RATE) {}
     
     // collect sensor data from all nodes
 //    receiveNodeData(node);
-    receiveVR_Data();
-    
+
+    if (currentTime - lastSentTime >= SEND_RATE)
+    {
+    receiveVR_Data();  
     lastSentTime = millis();
+    }
+    else
+    {}
+    
+
 }
