@@ -84,16 +84,18 @@ int Motor2_Speed = 0;
 int Controlled = 0;
 
 //==================================================================//
+// ------------------------ GLOBAL CONSTANTS ------------------------- // 
 
 int Initialize = 0;
 
 unsigned long start_time;
 
-
-
-
-
-
+/* INITIALIZE DATA BEING SEND TO PI (so we always have something to send)
+/ motor_speeds = int(0)
+/ temp = int(0)
+/ target_timing = float(0.0) or int() in micros
+/ ball_speed = float(meters/s)
+/ vr_command = int(1, 2, 3, 4, or 5) 
 
 
 
