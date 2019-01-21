@@ -21,8 +21,8 @@
 #include <printf.h>
 
 // chip select and RF24 radio setup pins
-#define CE_PIN 5
-#define CSN_PIN 6
+#define CE_PIN 7
+#define CSN_PIN 10
 RF24 radio(CE_PIN,CSN_PIN);
 
 // set this to appropriate slave device number minus 1 (e.g. 0 for device 1)
@@ -149,8 +149,9 @@ enum Wordset3
 
 // use negative group for wordsets
 int8_t group, idx;
-int VR_command = reset_data;
+int VR_command; // = -1;
 
+unsigned long current_time;
 
 
 
@@ -242,7 +243,7 @@ bridge:
 /********************************************************************/
 // ---------------------------- WIRELESS -------------------------- //
 
-  pinMode(10, OUTPUT);           // set pin to input
+//  pinMode(10, OUTPUT);           // set pin to input
 
   // setup serial communications for basic program display
   Serial.begin(9600);
@@ -262,20 +263,20 @@ bridge:
   radio.setChannel(0x76);
 
   // open a reading pipe on the chosen address for selected node
-  radio.openReadingPipe(1, nodeAddress[NODE_ID]);     
+  radio.openReadingPipe(1, nodeAddresses[NODE_ID]);     
 
   // enable ack payload - slave reply with data using this feature
   radio.enableAckPayload();
 
   // preload the payload with initial data - sent after an incoming message is read
-  radio.writeAckPayload(1, &VR_command, sizeof(VR_command);
+  radio.writeAckPayload(1, &VR_command, sizeof(VR_command));
 
   // print radio config details to console
   printf_begin();
   radio.printDetails();
 
   // start listening on radio
-  radio.startListening();
+//  radio.startListening();
   
 }
 
@@ -292,16 +293,19 @@ void loop()
 if (VR_command == -1)
 {
   Easy_VR();
+
 }
 
 else
 {
     if (buffered == 0)
     {
-      radio.writeAckPayload(1, &VR_command, sizeof(VR_command);
+      radio.startListening();
+      radio.writeAckPayload(1, &VR_command, sizeof(VR_command));
       buffered = 1;
     }
     Wireless();
+    
 }
 
 }
@@ -340,7 +344,7 @@ void updateNodeData(void)
   // set the ack payload ready for next request from the master device
 //  radio.writeAckPayload(1, &reset_data, sizeof(reset_data));
 
-  radio.writeAckPayload(1, &VR_command, sizeof(VR_command);
+  radio.writeAckPayload(1, &VR_command, sizeof(VR_command));
 }
 
 
@@ -353,11 +357,14 @@ void radioCheckAndReply(void)
     // check for radio message and send sensor data using auto-ack
     if ( radio.available() ) {
           radio.read( &dataFromMaster, sizeof(dataFromMaster) );
+//          current_time = millis();
           Serial.println("Received request from master - sending preloaded data.");
           Serial.print("The received signal from the master was: ");
           Serial.println(dataFromMaster);
           Serial.println("--------------------------------------------------------");
-          
+          Serial.println(VR_command);
+      
+          radio.stopListening();
           // update the node count after sending ack payload - provides continually changing data
           VR_command = -1;
           buffered = 0;
