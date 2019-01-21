@@ -154,61 +154,27 @@ void setup() {
 
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
-
-  
-
-
-
-
 }
 
-  
-
 //==================================================================//
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 void loop() {
   // put your main code here, to run repeatedly:
   
-if (Initialize == 0)
-{
+if (Initialize == 0){
  getTemp();
  Initialize = 1; 
 }
 
-else
-{
+else{
 LIDAR();
 Serial_Input(); 
 
-if (data_receive == 1)
-{
-  if (Controlled == 0)
- {
+if (data_receive == 1){
+  if (Controlled == 0){
   Motor_Control();
  }
- else if ((millis() - start_time) > 5000)
- {
-  
+ else if ((millis() - start_time) > 5000){
   simple_FeedBall();
   Motor1_Speed = 0;
   Motor2_Speed = 0;
@@ -218,8 +184,7 @@ if (data_receive == 1)
   data_receive = 0;
   Controlled = 0; 
  }
- else
- {}
+ else{}
  
 }
 }
