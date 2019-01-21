@@ -14,7 +14,7 @@
 #else
   // Shield Jumper on SW (using pins 12/13 or 8/9 as RX/TX)
   #include "SoftwareSerial.h"
-  SoftwareSerial port(12, 13);
+  SoftwareSerial port(8, 9);
   #define pcSerial SERIAL_PORT_MONITOR
 #endif
 
