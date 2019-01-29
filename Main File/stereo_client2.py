@@ -1,4 +1,4 @@
-## import the necessary packages
+Serial## import the necessary packages
 #import subprocess
 #subprocess.call(["source", "~/.profile"])
 #subprocess.call(["workon", "cv"])
