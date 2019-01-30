@@ -2,7 +2,7 @@
 
 ## Physical Setup
 
-![alt text](STARS/Main File/Overview-Physical Overview.png)
+![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Overview-Physical%20Overview.png)
 
 For testing purposes, the "External Computer" (Laptop) is connected to the server Pi via ssh (use Putty on Windows/Mac or bash terminal on Linux)
   - For the time being this requires hotspotting a phone and connecting both the laptop and Raspberry Pi
