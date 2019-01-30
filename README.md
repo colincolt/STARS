@@ -20,20 +20,35 @@ These instructions will get you a copy of the project up and running on your loc
 ### Prerequisites
 
 Step 1:
-Running the STEREOSCOPICMAIN_Server.py Script requires the OpenCV2 Libraries(Just the basic ones), follow the first half of instruction in the
-following links: 
-Windows: https://docs.opencv.org/2.4/doc/tutorials/introduction/windows_install/windows_install.html
-Mac OS: https://stackoverflow.com/questions/46066903/how-can-i-install-opencv2-with-brew-under-osx
+Running the application (both client and server) requires having openCV 3.3.0 or greater, follow the instructions in the following link with the exception of installing and entering a virtual environment in step #4 (virtual environments are for testing purposes only, this Raspberry Pi will be dedicated to running an openCV program, thus installing system-wide is preferred): https://www.pyimagesearch.com/2017/09/04/raspbian-stretch-install-opencv-3-python-on-your-raspberry-pi/
 
-Step 2: Also requires python module "Numpy", navigate to (in windows cmd) "cd c:\Python27\Scripts" and run "easy_install.exe Numpy"
+Step 2: 
+Once the two Raspberry Pi's have all the necessary python modules installed, connect the ethernet cables between them
+  - once connected, the server IP will not change as it is not connected to any router that would assign Dynamic IP's, thus there is no need to set a static IP within the Debian system for the sake of a sockets connection between operating python programs on each Raspberry Pi.
 
-Step 3: Might have to "pip install imutils" and maybe "multithreading" if not present
+Step 3: Set the client_pi.py script to start at boot on the client Raspberry Pi using the method described here: https://www.pyimagesearch.com/2016/05/16/running-a-python-opencv-script-on-reboot/
 
-### Installing
+Step 4: Set the gui.py application to start on boot on the server Raspberry Pi using the method described in the link listed above
+  - Copy all files into a folder:
+    - gui.py
+    - logo.gif
+    - server_pi.py
 
+Step 5: Make sure BOTH the Arduino Mega and Uno are connected to the sensors and motors, and the serial cable is plugged into the server
 
 ## Running the tests
-
+Step 1: Ensure 5 balls are loaded into the hopper
+  If the drill selection is Dynamic
+    - Send voice command "Begin"
+    - player starts further away (15-25 meters) or closer (5-15 meters) and runs in the opposite direction of starting distance
+    - Launcher sends a ball every 8 seconds to players predicted location, waiting for a voice command to "Stop" in between each
+    If the drill selection is Static
+  - Send voice command "Begin"
+  - player starts further away (15-25 meters) or closer (5-15 meters) and moves in the opposite direction of starting distance
+  - Launcher sends a ball every 8 seconds to players static location, waiting for a voice command to "Stop" in between each
+   If the drill selection is Manual
+    - Send voice command "Begin"
+    - Player starts at any distance and ball launches everytime the voice command "Begin" is received   
 
 
 ## Deployment
