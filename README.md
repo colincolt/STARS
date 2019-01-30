@@ -38,15 +38,21 @@ Step 5: Make sure BOTH the Arduino Mega and Uno are connected to the sensors and
 
 ## Running the tests
 Step 1: Ensure 5 balls are loaded into the hopper
-  If the drill selection is Dynamic
+
+  - If the drill selection is Dynamic
+  
     - Send voice command "Begin"
     - player starts further away (15-25 meters) or closer (5-15 meters) and runs in the opposite direction of starting distance
     - Launcher sends a ball every 8 seconds to players predicted location, waiting for a voice command to "Stop" in between each
-    If the drill selection is Static
-  - Send voice command "Begin"
-  - player starts further away (15-25 meters) or closer (5-15 meters) and moves in the opposite direction of starting distance
-  - Launcher sends a ball every 8 seconds to players static location, waiting for a voice command to "Stop" in between each
-   If the drill selection is Manual
+    
+  - If the drill selection is Static
+  
+    - Send voice command "Begin"
+    - player starts further away (15-25 meters) or closer (5-15 meters) and moves in the opposite direction of starting distance
+    - Launcher sends a ball every 8 seconds to players static location, waiting for a voice command to "Stop" in between each
+  
+   - If the drill selection is Manual
+   
     - Send voice command "Begin"
     - Player starts at any distance and ball launches everytime the voice command "Begin" is received   
 
