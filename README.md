@@ -47,7 +47,7 @@ For more info on Threading: https://docs.python.org/3/library/threading.html
 
 ## Built With
 
-* [Python2.7]
+* [Python3.6]
 
 
 ## License
