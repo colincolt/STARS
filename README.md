@@ -1,8 +1,17 @@
 # S.T.A.R.S App
 
-Main Program on the Server
+## Physical Setup
 
-![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/PseudoCode.png)
+![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Overview-Physical Overview.png)
+
+For testing purposes, the "External Computer" (Laptop) is connected to the server Pi via ssh (use Putty on Windows/Mac or bash terminal on Linux)
+  - For the time being this requires hotspotting a phone and connecting both the laptop and Raspberry Pi
+  - Note: Raspbian(Debian) or any OS can only assign one IP address per physical link (i.e. One IP for the WiFi chip, another for the Ethernet port, as well as virtual internal addresses for SOCKETS connections between python threads/processes)
+
+## Pseudo-Code for the server_pi.py file
+
+![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Overview-Pseudo-code Overview.png)
+
 
 ## Getting Started
 
