@@ -10,7 +10,7 @@ For testing purposes, the "External Computer" (Laptop) is connected to the serve
 
 ## Pseudo-Code for the server_pi.py file
 
-![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Overview-Pseudo-code Overview.png)
+![alt text](https://github.com/colincolt/STARS/blob/master/Main%20File/Overview-Pseudo-code%20Overview.png)
 
 
 ## Getting Started
