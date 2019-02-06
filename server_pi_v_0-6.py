@@ -154,21 +154,17 @@ class PitchYaw(Thread):
         # ** __ IMPORTANT VARIABLES: __ ** #
         LEAD_SPEED = 25                         # << Adjust the added motorSpeed of the YAW for DYNAMIC MODE (0-255)
         MAX_YAW_SPEED = 0.15                    # << Maximum speed of Yaw in radians
-        pitchAngleTable = np.array([[6, 16],             # << Pitch angle lookup table based on estimations
-                                    [8, 16],
-                                    [10, 20],
-                                    [12, 22],
-                                    [14, 24],
-                                    [16, 26],
-                                    [18, 28],
-                                    [20, 30],
-                                    [22, 32],
-                                    [24, 34],
-                                    [26, 36],
-                                    [28, 38],
-                                    [30, 40],
-                                    [32, 42],
-                                    [34, 44]])
+        pitchAngleTable = np.array([[5, 27],             # << Pitch angle lookup table based on estimations
+                                    [7, 28],
+                                    [9, 29],
+                                    [11, 30],
+                                    [13, 31],
+                                    [15, 32],
+                                    [17, 33],
+                                    [19, 34],
+                                    [21, 35],
+                                    [23, 36],
+                                    [25, 37]])
 
         while not startData:
             # _ARDUINO_UNO__SERIAL_OPEN
@@ -264,9 +260,9 @@ class PitchYaw(Thread):
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
-                        row = 6 - int(round(usedDistance / 2)) * 2
+                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1
                         if row < 0: row = 0
-                        elif row > 14: row = 14
+                        elif row > 11: row = 11
                         pitchAngle = pitchAngleTable(row, 1) + launcherAngle # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
 
                         # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
@@ -339,9 +335,9 @@ class PitchYaw(Thread):
                             oldzDist = usedDistance
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = 6 - int(round((FUT_FINAL_DIST / 2)) * 2)  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
+                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
                         if row < 0: row = 0
-                        elif row > 14: row = 14
+                        elif row > 11: row = 11
                         pitchAngle = pitchAngleTable(row, 1)  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                         # ** ____________________________________________________________________ ** #
@@ -449,9 +445,9 @@ class PitchYaw(Thread):
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
-                    row = 6 - int(round(usedDistance / 2)) * 2
+                    row = 4 - (int(round(usedDistance / 2)) * 2) - 1
                     if row < 0: row = 0
-                    elif row > 14: row = 14
+                    elif row > 11: row = 11
                     pitchAngle = pitchAngleTable(row, 1) + launcherAngle # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                     # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
