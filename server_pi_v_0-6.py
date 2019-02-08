@@ -104,8 +104,6 @@ py_lock = Lock()
 # GLOBAL VARIABLES:
 distArray = []
 
-# #____________________________________THREADS__________________________________###
-
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
         # RECEIVE from UNO:
             # - launchAngle (from accelerometer)
@@ -501,10 +499,26 @@ class PitchYaw(Thread):
                     print('[PitchYaw(Thread)] : failed because of exception ' + e)
                     continue
 
-# __________ Sterepscopic Thread___________ #
 
 # _____________LAUNCHER THREAD_____________________#
 # Connects and communicates with the Arduino Mega: Launcher Motors, Ball Feeder, Wifi, Accelerometer? (Rangefinder?)
+# Launcher(Thread): ---> Arduino MEGA provide Angle values to both motors, request temperature's from the Uno, and distance measurements
+        # RECEIVE from MEGA:
+            # 
+        # SEND to MEGA:
+            # 
+            # 
+
+# Stack IO
+        # RECEIVE from STACKS:
+            # 
+            # 
+            # 
+            # 
+
+        # SEND to STACKS:
+            # 
+            
 class Launcher(Thread):
     def __init__(self, sendMegaDataStack, sendLidar2Stack, guiStack, getStereoStack, getLidar1Stack, sendfinalDistStack, sendTemperatureStack, getfutureDist):
         Thread.__init__(self)
@@ -1355,7 +1369,16 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
         time.sleep(1)
 
     # ___________ "MAIN THREAD" LOOP __________ #
-
+    # STACK IO
+    # RECEIVE from STACKS:
+    #
+    #
+    #
+    # SEND to STACKS:
+    #
+    #
+    #
+    
     while True:
         if drillType == "Dynamic":
             StartTime = time.time()
