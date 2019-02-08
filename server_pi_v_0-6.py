@@ -1,4 +1,3 @@
-# _________________________________READ ME______________________________________#
 # THREADING:
 # This file uses the python "threading" module to run any number of "Threads"
 # simultaneously, anything that needs to run continuously can be put into an
@@ -24,6 +23,22 @@ from threading import Event, Thread, Lock
 import serial.tools.list_ports
 import random
 
+# GLOBAL STACKS:
+stereoStack = Stack()
+lidar2Stack = Stack()
+guiStack = Stack()
+megaDataStack = Stack()
+finalDistStack = Stack()
+lidar1Stack = Stack()
+temperatureStack = Stack()
+futureDistStack = Stack()
+
+# GLOBAL FLAGS/EVENTS:
+shutdown_flag = Event()
+py_shutdown_flag = Event()
+#py_lock = Lock()
+
+# GLOBAL VARIABLES:
 
 class DistanceData:
     def __init__(self, p1, p2, p3, p4):
@@ -76,26 +91,6 @@ class Stack:
 
     def size(self):
         return len(self.items)
-
-
-# GLOBAL STACKS:
-stereoStack = Stack()
-lidar2Stack = Stack()
-guiStack = Stack()
-megaDataStack = Stack()
-finalDistStack = Stack()
-lidar1Stack = Stack()
-temperatureStack = Stack()
-futureDistStack = Stack()
-
-# GLOBAL FLAGS/EVENTS:
-shutdown_flag = Event()
-py_shutdown_flag = Event()
-py_lock = Lock()
-
-# GLOBAL VARIABLES:
-distArray = []
-
 
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
     # RECEIVE from UNO:
@@ -249,11 +244,9 @@ class PitchYaw(Thread):
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
-                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1
-                        if row < 0:
-                            row = 0
-                        elif row > 11:
-                            row = 11
+                        row = 5 - (int(round(usedDistance / 2)) * 2) - 1
+                        if row < 0: row = 0
+                        elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
 
                         # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
@@ -326,12 +319,10 @@ class PitchYaw(Thread):
                             oldzDist = usedDistance
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = 4 - (int(
+                        row = 5 - (int(
                             round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
-                        if row < 0:
-                            row = 0
-                        elif row > 11:
-                            row = 11
+                        if row < 0: row = 0
+                        elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                         # ** ____________________________________________________________________ ** #
@@ -439,11 +430,9 @@ class PitchYaw(Thread):
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
-                    row = 4 - (int(round(usedDistance / 2)) * 2) - 1
-                    if row < 0:
-                        row = 0
-                    elif row > 11:
-                        row = 11
+                    row = 5 - (int(round(usedDistance / 2)) * 2) - 1
+                    if row < 0: row = 0
+                    elif row > 11: row = 11
                     pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                     # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
@@ -962,7 +951,6 @@ class Launcher(Thread):
                             stereoData = self.getStereoStack.peek()
                             stereo_Distance = float(stereoData.distance)
                             # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
-                            # oldstereo_Distance = stereo_Distance # <-- Check for new data, needs edits
                         except ValueError as verr:
                             print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + str(verr))
                             if stereoData is None:
