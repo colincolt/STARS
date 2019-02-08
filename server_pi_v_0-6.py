@@ -1,14 +1,14 @@
 # _________________________________READ ME______________________________________#
 # THREADING:
-    # This file uses the python "threading" module to run any number of "Threads"
-    # simultaneously, anything that needs to run continuously can be put into an
-    # infinite loop, anything that needs to run independantly and not interfere
-    # with other tasks. THREADS are ideal for input output operations, we do not
-    # have a lot of math being done.
-    #
+# This file uses the python "threading" module to run any number of "Threads"
+# simultaneously, anything that needs to run continuously can be put into an
+# infinite loop, anything that needs to run independantly and not interfere
+# with other tasks. THREADS are ideal for input output operations, we do not
+# have a lot of math being done.
+#
 # STACKS:
-    # <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
-    # <     https://www.pythoncentral.io/stack-tutorial-python-implementation/     >
+# <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
+# <     https://www.pythoncentral.io/stack-tutorial-python-implementation/     >
 
 # Packages
 from collections import deque
@@ -23,17 +23,6 @@ import serial
 from threading import Event, Thread, Lock
 import serial.tools.list_ports
 import random
-# import sys
-# import os
-# import binascii
-# import smtplib
-# import math
-# import statistics
-# from picamera.array import PiRGBArray
-# from picamera import PiCamera
-# from queue import LifoQueue
-# import struct
-# import signal
 
 
 class DistanceData:
@@ -43,11 +32,13 @@ class DistanceData:
         self.p3 = p3
         self.p4 = p4
 
+
 class GuiInput:
     def __init__(self, p1, p2, p3):
         self.p1 = p1
         self.p2 = p2
         self.p3 = p3
+
 
 class StereoOutput:
     def __init__(self, p1, p2, p3, p4):
@@ -56,11 +47,13 @@ class StereoOutput:
         self.p3 = p3
         self.p4 = p4
 
+
 class MegaDataClass:
     def __init__(self, p1, p2, p3):
         self.p1 = p1
         self.p2 = p2
         self.p3 = p3
+
 
 class Stack:
     def __init__(self):
@@ -80,7 +73,6 @@ class Stack:
             return self.items[len(self.items) - 1]
         else:
             return None
-        return
 
     def size(self):
         return len(self.items)
@@ -104,31 +96,30 @@ py_lock = Lock()
 # GLOBAL VARIABLES:
 distArray = []
 
+
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
-        # RECEIVE from UNO:
-            # - launchAngle (from accelerometer)
-        # SEND to UNO:
-            # - pitchAngle <-- to linear actuator
-            # - motorSpeed <-- to the yaw motor
+    # RECEIVE from UNO:
+    # - launchAngle (from accelerometer)
+    # SEND to UNO:
+    # - pitchAngle <-- to linear actuator
+    # - motorSpeed <-- to the yaw motor
 
 # Stack IO
-        # RECEIVE from STACKS:
-            # - drillType from guiStack
-            # - temperature from temperatureStack
-            # - stereoDist from stereoStack
-            # - FINAL_DIST from finalDistStack
-            # - FUT_FINAL_DIST from futureDistStack
+# RECEIVE from STACKS:
+    # - drillType from guiStack
+    # - temperature from temperatureStack
+    # - stereoDist from stereoStack
+    # - FINAL_DIST from finalDistStack
+    # - FUT_FINAL_DIST from futureDistStack
 
-        # SEND to STACKS:
-            # - launcherAngle -->  launcherAngleStack --> Launcher(Thread)
-
-# from the Arduino Mega or Serial.
-# These distance measurements are also provided to the LAUNCHER THREAD
+# SEND to STACKS:
+    # - launcherAngle -->  launcherAngleStack --> Launcher(Thread)
 
 # _______PITCH AND YAW THREAD________ #
 
 class PitchYaw(Thread):
-    def __init__(self, getstereoStack, getguiStack, getTemperatureStack, getmegaDataStack, getfinalDistStack, getfutureDistStack):
+    def __init__(self, getstereoStack, getguiStack, getTemperatureStack, getmegaDataStack, getfinalDistStack,
+                 getfutureDistStack):
         Thread.__init__(self)
         self.getstereoStack = getstereoStack
         self.getguiStack = getguiStack
@@ -150,9 +141,9 @@ class PitchYaw(Thread):
         oldzDist = None
 
         # ** __ IMPORTANT VARIABLES: __ ** #
-        LEAD_SPEED = 25                         # << Adjust the added motorSpeed of the YAW for DYNAMIC MODE (0-255)
-        MAX_YAW_SPEED = 0.15                    # << Maximum speed of Yaw in radians
-        pitchAngleTable = np.array([[5, 27],             # << Pitch angle lookup table based on estimations
+        LEAD_SPEED = 25  # << Adjust the added motorSpeed of the YAW for DYNAMIC MODE (0-255)
+        MAX_YAW_SPEED = 0.15  # << Maximum speed of Yaw in radians
+        pitchAngleTable = np.array([[5, 27],  # << Pitch angle lookup table based on estimations
                                     [7, 28],
                                     [9, 29],
                                     [11, 30],
@@ -167,23 +158,23 @@ class PitchYaw(Thread):
         while not startData:
             # _ARDUINO_UNO__SERIAL_OPEN
             try:
-            # Initialize Arduino UNO
+                # Initialize Arduino UNO
                 UNO = serial.Serial("/dev/uno", 9600)  # change ACM number as found from "ls /dev/tty*"
                 UNO.baudrate = 9600
-            # ACQUIRE ACCELEROMETER DATA (Single Pitch reading) _______ #
+                # ACQUIRE ACCELEROMETER DATA (Single Pitch reading) _______ #
                 tempAngle = GetUnoData(UNO)
                 launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
-            # Get Temperature Data
+                # Get Temperature Data
                 temperature = self.getTemperatureStack.peek()
-                tempCorrection = temperature / 25               # <<<tempCorrection factor
+                tempCorrection = temperature / 25  # <<<tempCorrection factor
 
-            # Get GUI Data
+                # Get GUI Data
                 guiData = self.getguiStack.peek()
                 # drillSpeed = guiData.speed
                 # difficulty = guiData.difficulty
                 drillType = guiData.drilltype
             except Exception as err:
-                print('[PithYaw(Thread)] : failed to get startup data... trying again' + err)
+                print('[PithYaw(Thread)] : failed to get startup data... trying again' + str(err))
                 continue
             else:
                 print("[PitchYaw(Thread)] : Received start data")
@@ -191,9 +182,9 @@ class PitchYaw(Thread):
                 continue
 
         # print("[PitchYaw(Thread)] : Speed:  " + str(speed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
-        print ("[PitchYaw(Thread)] : starting Loop")
+        print("[PitchYaw(Thread)] : starting Loop")
 
-        while not self.py_shutdown_flag.isSet():    # <<< BEGINNING OF PITCHYAW LOOP _________________________________ ** #
+        while not self.py_shutdown_flag.isSet():  # <<< BEGINNING OF PITCHYAW LOOP _________________________________ ** #
             MEGAdata = self.getmegaDataStack.peek()
             voiceCommand = MEGAdata.voicecommand
             while voiceCommand != "beginVC":
@@ -210,14 +201,14 @@ class PitchYaw(Thread):
                         try:
                             stereodata = self.getstereoStack.peek()
                             cameradata = True
-                        except: # EmptyStackError # <- return EmptyStackError if Stack is empty in peek #####!!!!!!!
+                        except:  # EmptyStackError # <- return EmptyStackError if Stack is empty in peek #####!!!!!!!
                             print("[PithYaw(Thread)] : no data in stereoStack")
                             self.py_shutdown_flag.set()
                             # while count <= 5:
-                                # if EmptyStackError raised
-                                    # count += 1
-                                    # continue
-                                # else: count = 5
+                            # if EmptyStackError raised
+                            # count += 1
+                            # continue
+                            # else: count = 5
 
                     LeftXcoord = stereodata.masterval
                     RightXcoord = stereodata.slaveval
@@ -259,12 +250,14 @@ class PitchYaw(Thread):
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
                         row = 4 - (int(round(usedDistance / 2)) * 2) - 1
-                        if row < 0: row = 0
-                        elif row > 11: row = 11
-                        pitchAngle = pitchAngleTable(row, 1) + launcherAngle # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
+                        if row < 0:
+                            row = 0
+                        elif row > 11:
+                            row = 11
+                        pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
 
                         # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
-                        latPixelDisp = (2464 - LeftXcoord - RightXcoord)                            # << DICTATES SIGN OF MOTORSPEED
+                        latPixelDisp = (2464 - LeftXcoord - RightXcoord)  # << DICTATES SIGN OF MOTORSPEED
                         PixToDistApprox = usedDistance / 250  # <<< nonsense Conversion at the moment
                         lateralDisplacement = latPixelDisp * PixToDistApprox
                         latDispDeque.appendleft(lateralDisplacement)
@@ -274,9 +267,9 @@ class PitchYaw(Thread):
                         # IF MULTIPLE RECORDED MEASUREMENTS, BASE MOTORSPEED ESTIMATION OFF PLAYERS SPEED ESTIMATION (V = omega*R):
                         if latTimeDeque[0] is not None:
                             latSpeed = (latDispDeque[1] - latDispDeque[0]) / latTimeDeque[0]
-                            angularSpeed = ( abs(latSpeed) / usedDistance ) * 3.14              #<< Convert to radians
+                            angularSpeed = (abs(latSpeed) / usedDistance) * 3.14  # << Convert to radians
                             # CURRENT MAXIMUM ANGULAR SPEED: Omega = 6 deg/sec OR 0.15
-                            motorSpeed = ( angularSpeed / MAX_YAW_SPEED) * 255
+                            motorSpeed = (angularSpeed / MAX_YAW_SPEED) * 255
                             # For Dynamic, we want to be leading the players movement:
                             motorSpeed = motorSpeed + LEAD_SPEED
                             if motorSpeed >= 255: motorSpeed = 255
@@ -321,22 +314,25 @@ class PitchYaw(Thread):
                         # << CASE 2: Have to predict FUT_FINAL_DIST ourselves if we dont get it
                         # ** ________"PREDICT" FUT_FINAL_DIST (z-distance) of the player from available data: ________ ** #
                         # __________________ IF THIS IS THE FIRST MEASUREMENT: ____________
-                        if oldzDist is None:    # This is the first measurement
+                        if oldzDist is None:  # This is the first measurement
                             oldzDist = usedDistance
                             speed = 0
                             FUT_FINAL_DIST = usedDistance
                         else:
                             tempDist = usedDistance - oldzDist
-                            speed = tempDist / latTimeDeque[0] # meters/second
+                            speed = tempDist / latTimeDeque[0]  # meters/second
                             # the idea is to stay ahead of the player by at least a second or two
                             FUT_FINAL_DIST = usedDistance + speed * 2
                             oldzDist = usedDistance
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
-                        if row < 0: row = 0
-                        elif row > 11: row = 11
-                        pitchAngle = pitchAngleTable(row, 1)  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
+                        row = 4 - (int(
+                            round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
+                        if row < 0:
+                            row = 0
+                        elif row > 11:
+                            row = 11
+                        pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                         # ** ____________________________________________________________________ ** #
 
@@ -419,7 +415,7 @@ class PitchYaw(Thread):
                         latTimeDeque.appendleft(None)
                     else:
                         latDispTime = oldLatStartTime - latStartTime
-                        latTimeDeque.appendleft(latDispTime)            # << Deque for time between measurements
+                        latTimeDeque.appendleft(latDispTime)  # << Deque for time between measurements
                         oldLatStartTime = latStartTime
                         if len(latTimeDeque) > 10:
                             latTimeDeque.pop()
@@ -444,9 +440,11 @@ class PitchYaw(Thread):
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
                     row = 4 - (int(round(usedDistance / 2)) * 2) - 1
-                    if row < 0: row = 0
-                    elif row > 11: row = 11
-                    pitchAngle = pitchAngleTable(row, 1) + launcherAngle # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
+                    if row < 0:
+                        row = 0
+                    elif row > 11:
+                        row = 11
+                    pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                     # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
                     latPixelDisp = (2464 - LeftXcoord - RightXcoord)  # << DICTATES SIGN OF MOTORSPEED
@@ -503,24 +501,25 @@ class PitchYaw(Thread):
 # _____________LAUNCHER THREAD_____________________#
 # Connects and communicates with the Arduino Mega: Launcher Motors, Ball Feeder, Wifi, Accelerometer? (Rangefinder?)
 # Launcher(Thread): ---> Arduino MEGA provide Angle values to both motors, request temperature's from the Uno, and distance measurements
-        # RECEIVE from MEGA:
-            # 
-        # SEND to MEGA:
-            # 
-            # 
+# RECEIVE from MEGA:
+#
+# SEND to MEGA:
+#
+#
 
 # Stack IO
-        # RECEIVE from STACKS:
-            # 
-            # 
-            # 
-            # 
+# RECEIVE from STACKS:
+#
+#
+#
+#
 
-        # SEND to STACKS:
-            # 
-            
+# SEND to STACKS:
+#
+
 class Launcher(Thread):
-    def __init__(self, sendMegaDataStack, sendLidar2Stack, guiStack, getStereoStack, getLidar1Stack, sendfinalDistStack, sendTemperatureStack, getfutureDist):
+    def __init__(self, sendMegaDataStack, sendLidar2Stack, guiStack, getStereoStack, getLidar1Stack, sendfinalDistStack,
+                 sendTemperatureStack, getfutureDist):
         Thread.__init__(self)
         self.sendMegaDataStack = sendMegaDataStack
         self.sendLidar2Stack = sendLidar2Stack
@@ -530,16 +529,15 @@ class Launcher(Thread):
         self.sendfinalDistStack = sendfinalDistStack
         self.sendTemperatureStack = sendTemperatureStack
         self.getfutureDist = getfutureDist
-        self.shutdown_flag = Event()                # <<< SHUTDOWN FLAG
-
+        self.shutdown_flag = Event()  # <<< SHUTDOWN FLAG
 
     def run(self):
         # _____ Launcher common variables:
-        beginVC =   1
-        stopVC =    2
-        fasterVC =  3
-        slowerVC =  4
-        pauseVC =   5
+        beginVC = 1
+        stopVC = 2
+        fasterVC = 3
+        slowerVC = 4
+        pauseVC = 5
         drillCount = 0
         OLD_FUT_FINAL_DIST = None
         LaunchTime = None
@@ -550,9 +548,9 @@ class Launcher(Thread):
         DYNAMIC_WAIT_TIME = 3
         STATIC_WAIT_TIME = 5
 
-        while not startData:        # <- Add a timeout to the the start loop
+        while not startData:  # <- Add a timeout to the the start loop
             try:
-            # _____ open MEGA serial port
+                # _____ open MEGA serial port
                 MEGA = serial.Serial('/dev/mega', 9600)
                 MEGA.timeout = None
                 baudrate = 9600,
@@ -562,7 +560,7 @@ class Launcher(Thread):
                 print("[Launcher(Thread)] : Connected to MEGA")
 
                 getMegaData = GetMegaData(MEGA)
-            # Get TEMPERATURE and voiceCommand --> send to PITCH_YAW Thread
+                # Get TEMPERATURE and voiceCommand --> send to PITCH_YAW Thread
                 temperature = int(getMegaData.strip().split(",")[1])  # temperature = int()
                 voiceCommand = int(getMegaData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
                 MegaData.temperature = temperature
@@ -570,8 +568,8 @@ class Launcher(Thread):
                 self.sendTemperatureStack.push(temperature)
                 self.sendMegaDataStack.push(MegaData)
 
-            # ****SET TEMPERATURE CORRECTION FACTOR*****
-                tempCorrect = temperature/25
+                # ****SET TEMPERATURE CORRECTION FACTOR*****
+                tempCorrect = temperature / 25
                 # *****************************************
 
                 # Get drillType data from GUI__ #
@@ -579,7 +577,7 @@ class Launcher(Thread):
                 drillSpeed = guiData.speed
                 difficulty = guiData.difficulty
                 drillType = guiData.drilltype
-                #print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
+                # print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
 
                 while voiceCommand != beginVC:
                     getMegaData = GetMegaData()
@@ -589,8 +587,8 @@ class Launcher(Thread):
             except serial.SerialException as err:
                 print("[Launcher(Thread)] : MEGA not detected" + err)
                 continue
-            except Exception as e: #(serial.SerialException)
-                print("[Launcher(Thread)] : Error in setup" + e)
+            except Exception as e:  # (serial.SerialException)
+                print("[Launcher(Thread)] : Error in setup" + str(e))
                 self.shutdown_flag.set()
                 continue
             else:
@@ -619,7 +617,7 @@ class Launcher(Thread):
                         # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
                         # oldstereo_Distance = stereo_Distance # <-- Check for new data, needs edits
                     except ValueError as verr:
-                        print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + verr)
+                        print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + str(err))
                         if stereoData is None:
                             print("[Launcher(Thread)] : ... because Stack is Empty")
                             continue
@@ -641,7 +639,7 @@ class Launcher(Thread):
                     except serial.SerialException as err:
                         print("[Launcher(Thread)] : MEGA not detected" + err)
                     except Exception as e:  # (serial.SerialException)
-                        print("[Launcher(Thread)] : Error in setup" + e)
+                        print("[Launcher(Thread)] : Error in setup" + str(e))
                         success = False
                         while not success:
                             try:
@@ -649,7 +647,7 @@ class Launcher(Thread):
                                 success = True
                             except Exception as r:
                                 print("[Launcher(Thread)] : GetMegaData failed" + r)
-                                continue # < Try again
+                                continue  # < Try again
 
                     lidar_2_Distance = int(tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
                     # temperature = int(tempData.strip().split(",")[1])                            # temperature = int()
@@ -677,7 +675,7 @@ class Launcher(Thread):
                     # ___________________       Handle Voice input:     ______________________________________________ #
                     if voiceCommand == stopVC:
                         self.shutdown_flag.set()
-                        continue # <-- Starts next iteration of parent loop where the shutdown flag is caught
+                        continue  # <-- Starts next iteration of parent loop where the shutdown flag is caught
                     elif voiceCommand == fasterVC:
                         drillSpeed += 1
                     elif voiceCommand == slowerVC:
@@ -685,24 +683,24 @@ class Launcher(Thread):
                     elif voiceCommand == pauseVC:
                         print("[Launcher(Thread)] : Sorry no Pause function")
 
-
                     if lidar_2_Distance is not None and abs(stereo_Distance - lidar_2_Distance) <= 5:
                         distanceTotal += lidar_2_Distance
                         rationaleDistMeasures += 1
                         lidar_2_Distance = lidar_2_Distance / 100  # << convert LIDAR 2 from cm to meters
                         self.sendLidar2Stack.push(lidar_2_Distance)
                     else:
-                        self.sendLidar2Stack.push(None)     # <<send empty value so we know theres no new data
+                        self.sendLidar2Stack.push(None)  # <<send empty value so we know theres no new data
 
                     try:
                         lidar_1_Distance = self.getLidar1Stack.peek()
-                        if lidar_1_Distance is not None and abs(stereo_Distance - lidar_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                        if lidar_1_Distance is not None and abs(
+                                stereo_Distance - lidar_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                             rationaleDistMeasures += 1
-                            lidar_1_Distance = lidar_1_Distance / 1000 # <<<<<< CONVERT to meters from mm
+                            lidar_1_Distance = lidar_1_Distance / 1000  # <<<<<< CONVERT to meters from mm
                             distanceTotal += lidar_1_Distance
 
                     except Exception as stackemp:
-                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + stackemp)
+                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + str(stackemp))
                         pass
 
                     # CALCULATE AND SEND TOTAL TO MAIN THREAD
@@ -711,17 +709,19 @@ class Launcher(Thread):
 
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
-                    RPM = -1.13635244 * FINAL_DIST^2 + 97.7378699 * FINAL_DIST + 646.034298 # <-- Polynomial fit
-                    motorSpeed1,motorSpeed2 = round((RPM/5000)*255) # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
+                    RPM = -1.13635244 * FINAL_DIST ^ 2 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
+                    motorSpeed1, motorSpeed2 = round(
+                        (RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                     # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
                     MotorSpeed1 = str(motorSpeed1)
                     MotorSpeed2 = str(motorSpeed2)
                     # ***Randomize targetChoice
-                    targetChoice = int(random.choice([1,2,3,4]))
+                    targetChoice = int(random.choice([1, 2, 3, 4]))
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 0
-                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + targetChoice + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(
+                        difficulty) + ',' + str(ballFeed) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
@@ -743,15 +743,16 @@ class Launcher(Thread):
                         OLD_FUT_FINAL_DIST = FUT_FINAL_DIST
 
                     try:
-                        FUT_FINAL_DIST = self.getfutureDist.peek()      # <<<<< GET PREDICTED LOCATION
+                        FUT_FINAL_DIST = self.getfutureDist.peek()  # <<<<< GET PREDICTED LOCATION
                     except:
                         print("[Launcher(Thread)] : No FUT_FINAL_DIST data in futureDistStack")
                         FUT_FINAL_DIST = None
                         pass
 
-                    if FUT_FINAL_DIST is None or FUT_FINAL_DIST == OLD_FUT_FINAL_DIST: # <- no prediction is doen  in this thread so it will send AS IS
+                    if FUT_FINAL_DIST is None or FUT_FINAL_DIST == OLD_FUT_FINAL_DIST:  # <- no prediction is doen  in this thread so it will send AS IS
                         ballFeed = 1
-                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + targetChoice + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(
+                            difficulty) + ',' + str(ballFeed) + '>'
                         # write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
@@ -759,7 +760,7 @@ class Launcher(Thread):
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
                                 print("[Launcher(Thread)] : Launch signal sent to MEGA")
-                            except Exception as e:
+                            except:
                                 sendsuccess = False
                                 while not sendsuccess:
                                     try:
@@ -777,18 +778,19 @@ class Launcher(Thread):
                             self.shutdown_flag.set()
 
                     else:
-                        time.sleep(0.1) # <-- ALLOW TIME FOR PREVIOUS DATA TO BE READ AND CLEARED FROM THE BUFFER
+                        time.sleep(0.1)  # <-- ALLOW TIME FOR PREVIOUS DATA TO BE READ AND CLEARED FROM THE BUFFER
 
                         # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                         RPM = -1.13635244 * FUT_FINAL_DIST ^ 2 + 97.7378699 * FUT_FINAL_DIST + 646.034298  # <-- Polynomial fit
-                        motorSpeed1, motorSpeed2 = round((RPM / 5000) * 255) # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
+                        motorSpeed1, motorSpeed2 = round(
+                            (RPM / 5000) * 255)  # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                         # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
                         MotorSpeed1 = str(motorSpeed1)
                         MotorSpeed2 = str(motorSpeed2)
                         # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                         ballFeed = 1
-                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + targetChoice + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
                         # Write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
@@ -796,7 +798,7 @@ class Launcher(Thread):
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
                                 print("[Launcher(Thread)] : Launch signal sent to MEGA")
-                            except Exception as e:
+                            except:
                                 sendsuccess = False
                                 while not sendsuccess:
                                     try:
@@ -820,7 +822,7 @@ class Launcher(Thread):
                     if LaunchTime is None:
                         pass
                     else:
-                        while (time.time() - LaunchTime)< STATIC_WAIT_TIME:
+                        while (time.time() - LaunchTime) < STATIC_WAIT_TIME:
                             print("[Launcher(Thread)] : Waiting for results from target: WIFI")
 
                     startTime = time.time()
@@ -832,7 +834,7 @@ class Launcher(Thread):
                         # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
                         # oldstereo_Distance = stereo_Distance # <-- Check for new data, needs edits
                     except ValueError as verr:
-                        print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + verr)
+                        print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + str(verr))
                         if stereoData is None:
                             print("[Launcher(Thread)] : ... because Stack is Empty")
                             continue
@@ -914,7 +916,7 @@ class Launcher(Thread):
                             lidar_1_Distance = lidar_1_Distance / 1000  # <<<<<< CONVERT to meters from mm
                             distanceTotal += lidar_1_Distance
                     except Exception as stackemp:
-                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + stackemp)
+                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + str(stackemp))
                         pass
 
                     # CALCULATE AND SEND TOTAL TO MAIN THREAD
@@ -924,16 +926,17 @@ class Launcher(Thread):
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                     RPM = -1.13635244 * FINAL_DIST ^ 2 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
-                    motorSpeed1, motorSpeed2 = round((RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
+                    motorSpeed1, motorSpeed2 = round(
+                        (RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                     # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
                     MotorSpeed1 = str(motorSpeed1)
                     MotorSpeed2 = str(motorSpeed2)
                     # ***Randomize targetChoice
-                    targetChoice = int(random.choice([1,2,3,4]))
+                    targetChoice = int(random.choice([1, 2, 3, 4]))
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 1
-                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + targetChoice + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
@@ -951,7 +954,7 @@ class Launcher(Thread):
                                 if time.time() - startTime >= 1:
                                     self.shutdown_flag.set()
 
-                if drillType == 'Manual':   # ________________________________________________________________________ #
+                if drillType == 'Manual':  # ________________________________________________________________________ #
 
                     while voiceCommand != beginVC and voiceCommand != stopVC:
                         # ___________________ RECEIVE STEREO DISTANCE (Wait)______________________________________________#
@@ -961,7 +964,7 @@ class Launcher(Thread):
                             # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
                             # oldstereo_Distance = stereo_Distance # <-- Check for new data, needs edits
                         except ValueError as verr:
-                            print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + verr)
+                            print("[Launcher(Thread)] : StereoDistance couldnt be converted to float" + str(verr))
                             if stereoData is None:
                                 print("[Launcher(Thread)] : ... because Stack is Empty")
                                 continue
@@ -990,7 +993,7 @@ class Launcher(Thread):
                                     tempData = GetMegaData
                                     success = True
                                 except Exception as r:
-                                    print("[Launcher(Thread)] : GetMegaData failed" + r)
+                                    print("[Launcher(Thread)] : GetMegaData failed" + str(r))
                                     continue  # < Try again
 
                         lidar_2_Distance = int(tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
@@ -1027,8 +1030,6 @@ class Launcher(Thread):
                         elif voiceCommand == pauseVC:
                             print("[Launcher(Thread)] : Sorry no Pause function")
 
-
-
                     if lidar_2_Distance is not None and abs(stereo_Distance - lidar_2_Distance) <= 5:
                         distanceTotal += lidar_2_Distance
                         rationaleDistMeasures += 1
@@ -1045,7 +1046,7 @@ class Launcher(Thread):
                             lidar_1_Distance = lidar_1_Distance / 1000  # <<<<<< CONVERT to meters from mm
                             distanceTotal += lidar_1_Distance
                     except Exception as stackemp:
-                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + stackemp)
+                        print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + str(stackemp))
                         pass
 
                     # CALCULATE AND SEND TOTAL TO MAIN THREAD
@@ -1065,7 +1066,7 @@ class Launcher(Thread):
                     targetChoice = int(random.choice([1, 2, 3, 4]))
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 1
-                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + targetChoice + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
@@ -1089,7 +1090,6 @@ class Launcher(Thread):
         print("[Launcher(Thread)] : shutdown_flag detected!")
 
         # if self.shutdown_flag.isSet(): # <-- catch shutdown flag and do something
-
 
 
 def StereoscopicsThread(stereoStack):
@@ -1232,6 +1232,7 @@ def StereoscopicsThread(stereoStack):
             results.slaveval = slaveval
             stereoStack.push(results)
 
+
 def GetUnoData(UNO):
     getdata = False
     dataPresent = False
@@ -1247,7 +1248,7 @@ def GetUnoData(UNO):
                 except Exception as e:
                     print('[PitchYaw(Thread)] : didnt get Mega data' + e)
                 if startMarker == "<":
-                    unoDataStr = UNO.read(15)                                      # READ DATA FORMATTED AS ('< 1 >')
+                    unoDataStr = UNO.read(15)  # READ DATA FORMATTED AS ('< 1 >')
                     unoDataTemp = list(unoDataStr.decode())
                     unoDataTemp.insert(0, startMarker)
                     unoData = unoDataTemp[:unoDataTemp.index(">") + 1]
@@ -1262,6 +1263,7 @@ def GetUnoData(UNO):
             continue
             time.sleep(0.4)
         time.sleep(0.2)  # << MAY NEED TO BE CHANGED IF READ DATA IS GARBAGE
+
 
 def GetMegaData(MEGA):
     getdata = False
@@ -1279,7 +1281,7 @@ def GetMegaData(MEGA):
                 except Exception as e:
                     print('[Launcher(Thread)] : didnt get Mega data' + e)
                 if startMarker == "<":
-                    megaDataStr = MEGA.read(25)                                     # READ DATA FORMATTED AS ('< 1 2 3 4 5 >')
+                    megaDataStr = MEGA.read(25)  # READ DATA FORMATTED AS ('< 1 2 3 4 5 >')
                     megaDataTemp = list(megaDataStr.decode())
                     megaDataTemp.insert(0, startMarker)
                     megaData = megaDataTemp[:megaDataTemp.index(">") + 1]
@@ -1294,7 +1296,8 @@ def GetMegaData(MEGA):
                     continue
                     time.sleep(0.1)
                 # print(megaDataStr)
-                time.sleep(0.4) # < MAYBE IMPORTANT
+                time.sleep(0.4)  # < MAYBE IMPORTANT
+
 
 def Lidar1Dist(evo):
     while (1):
@@ -1314,6 +1317,16 @@ def Lidar1Dist(evo):
             print("[MainThread/Lidar1Dist] : No Evo Lidar present... connect it and restart the application" + a)
             return None
 
+ # startMainFile STACK IO
+    # RECEIVE from STACKS:
+    #
+    #
+    #
+    # SEND to STACKS:
+    #
+    #
+    #
+
 # MAIN FILE START
 def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, performs the bulk of calculation
     # # _______________________________Main Processing_____________________________________
@@ -1330,7 +1343,8 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
     guiData.difficulty = difficulty
     guiData.drilltype = drillType
     print("[MainThread] : ")
-    print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
+    print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(
+        guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
     print("_______________________________________")
 
     guiStack.push(guiData)
@@ -1356,12 +1370,14 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
 
     time.sleep(6)
     try:
-        pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack)
+        pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack,
+                                  futureDistStack)
         pitchYawthread.start()
     except Exception as e:
         print('[MainThread] : Pitch and Yaw thread didnt start because of exception ' + e)
     try:
-        startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack)
+        startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack,
+                                       temperatureStack, futureDistStack)
         startLauncherThread.start()
     except Exception as e:
         print('[MainThread] : Launcher thread didnt start because of exception ' + e)
@@ -1369,22 +1385,12 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
         time.sleep(1)
 
     # ___________ "MAIN THREAD" LOOP __________ #
-    # STACK IO
-    # RECEIVE from STACKS:
-    #
-    #
-    #
-    # SEND to STACKS:
-    #
-    #
-    #
-    
     while True:
         if drillType == "Dynamic":
             StartTime = time.time()
             # Get(WAIT) for stereoDistance _____________________________
             try:
-                oldstereo_Distance = stereo_Distance    # ****< NEED TO ENSURE THE STEREO.DISTANCE IS NEVER THE SAME TWICE IN A ROW
+                oldstereo_Distance = stereo_Distance  # ****< NEED TO ENSURE THE STEREO.DISTANCE IS NEVER THE SAME TWICE IN A ROW
                 stereoResult = stereoStack.peek()
                 stereo_Distance = stereoResult.distance
             except Exception as q:
@@ -1393,14 +1399,15 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
                     stereoResult = stereoStack.peek()
                     stereo_Distance = stereoResult.distance
 
-            if 5 <= stereo_Distance <= 30: # Meters
+            if 5 <= stereo_Distance <= 30:  # Meters
                 rationaleDistMeasures = 1
                 distanceTotal = stereo_Distance
 
                 # Get(NO_WAIT) for Lidar_1_Dist _____________________________
                 try:
                     LIDAR_1_Distance = Lidar1Dist(evo)
-                    if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                    if LIDAR_1_Distance is not None and abs(
+                            stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                         rationaleDistMeasures += 1
                         distanceTotal += LIDAR_1_Distance
                         lidar1Stack.push(LIDAR_1_Distance)
@@ -1414,7 +1421,8 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
                 # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
                 try:
                     LIDAR_2_Distance = lidar2Stack.peek()
-                    if LIDAR_2_Distance is not None and abs(stereo_Distance - LIDAR_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                    if LIDAR_2_Distance is not None and abs(
+                            stereo_Distance - LIDAR_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                         rationaleDistMeasures += 1
                         distanceTotal += LIDAR_2_Distance
                 except Exception as w:
@@ -1426,14 +1434,13 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
                 # MAKE SURE LAUNCHER THREAD OBTAINS SIMILAR VALUE:
                 # Launcher_FINAL_DIST = finalDistStack.peek()
                 # if newFinalDistLauncher_flag() = True
-                    # Launcher_FINAL_DIST = finalDistStack.peek()
-                    # if abs(Launcher_FINAL_DIST - PRE_FINAL_DIST) <= 2 # Meters
-                        # Do everything
-                    # else:
-                        # print("[Main Thread] : Something is wrong with the data flow")
+                # Launcher_FINAL_DIST = finalDistStack.peek()
+                # if abs(Launcher_FINAL_DIST - PRE_FINAL_DIST) <= 2 # Meters
+                # Do everything
+                # else:
+                # print("[Main Thread] : Something is wrong with the data flow")
 
                 timeDeque.appendleft(time.time() - StartTime)
-
 
                 if oldzDistDeque == []:  # This is the first measurement
                     oldzDistDeque.appendleft(PRE_FINAL_DIST)
@@ -1441,7 +1448,8 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
                 elif len(oldzDistDeque) < 10:
                     oldzDistDeque.appendleft(PRE_FINAL_DIST)
                     FUT_FINAL_DIST = None
-                elif len(oldzDistDeque) == 10:                  # Wait until we have 10 measurement before calculating players speed (if 5 FPS this means 2 sec)
+                elif len(
+                        oldzDistDeque) == 10:  # Wait until we have 10 measurement before calculating players speed (if 5 FPS this means 2 sec)
                     tempDist = PRE_FINAL_DIST - oldzDist[9]
                     playerspeed = tempDist / timeDeque[9]  # meters/second
                     # the idea is to stay ahead of the player by at least a second or two
@@ -1468,7 +1476,5 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
         else:
             print("[MainThread] : no GUI data")
 
-
 # ________ Run The Program ____________ #
 # startMainFile(3,4,"manual")  # for testing purposes only
-
