@@ -1409,11 +1409,6 @@ def startMainFile(speed, difficulty, drillType):  # , args): ## NOT A THREAD, pe
                     # else:
                         # print("[Main Thread] : Something is wrong with the data flow")
 
-                # ______________ **SOME PREDICTION METHOD** ______________
-                # Collect 10-20 PRE_FINAL_DIST + rationaleDistMeasures in an indexed list or dictionary
-                # weight the accuracy of PRE_FINAL_DIST base on the # of rationaleDistMeasures
-                # Calculate speed and z-travel direction
-                # Determine location in 3-4 seconds assuming trajectory is continued
                 timeDeque.appendleft(time.time() - StartTime)
 
 
