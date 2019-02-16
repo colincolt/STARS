@@ -21,7 +21,7 @@ global import_error
 try:
     import cv2
     import imutils
-    from imutils import VideoStream
+    from imutils.video import VideoStream
     import_error = False
 except ImportError as imp:
     print("IMPORTANT  :   WITHOUT OPENCV3.0 THE STEREOSCOPICS WILL NOT OPERATE" + str(imp))
