@@ -12,13 +12,21 @@
 
 # Packages
 from collections import deque
-from imutils.video import VideoStream
 import numpy as np
 import argparse
-import cv2
-import imutils
 import time
 import socket
+
+global import_error
+try:
+    import cv2
+    import imutils
+    from imutils import VideoStream
+    import_error = False
+except ImportError as imp:
+    print("IMPORTANT  :   WITHOUT OPENCV3.0 THE STEREOSCOPICS WILL NOT OPERATE" + str(imp))
+    import_error = True
+
 import serial
 from threading import Event, Thread, Lock
 import serial.tools.list_ports
@@ -1397,11 +1405,14 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
 
     if not shutdown_event.isSet() and not kill_event.isSet():
         print("Starting Threads")
-        try:
-            process = Thread(target=StereoscopicsThread, args=[stereoStack, shutdown_event, kill_event])
-            process.start()
-        except Exception as e:
-            print('[MainThread] : Stereo thread failed because of exception ' + str(e))
+        if import_error:
+            print("[MainThread] : STERESCOPICS NOT STARTING")
+        else:
+            try:
+                process = Thread(target=StereoscopicsThread, args=[stereoStack, shutdown_event, kill_event])
+                process.start()
+            except Exception as e:
+                print('[MainThread] : Stereo thread failed because of exception ' + str(e))
 
         time.sleep(4)
         try:
@@ -1409,6 +1420,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
             pitchYawthread.start()
         except Exception as e:
             print('[MainThread] : Pitch and Yaw thread didnt start because of exception ' + str(e))
+
         try:
             startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
             startLauncherThread.start()
