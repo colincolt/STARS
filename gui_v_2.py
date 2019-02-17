@@ -93,7 +93,7 @@ class gui_app():
         difficulty.width = 300
 
         start_2 = PushButton(window2, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
-        stop_2 = PushButton(window2, command=self.stop_command, args=[], text="stop")
+        stop_2 = PushButton(window2, command=self.stop_command, args=[], text="Stop")
         exit_2 = PushButton(window2, command=self.exit_command, args=["window"], text="Exit")
         exit_2.width = 20
         exit_2.bg = "red"
@@ -115,7 +115,7 @@ class gui_app():
         speed.width = 300
 
         start_3 = PushButton(window3, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
-        stop_3 = PushButton(window3, command=self.stop_command, args=[], text="stop")
+        stop_3 = PushButton(window3, command=self.stop_command, args=[], text="Stop")
         exit_3 = PushButton(window3, command=self.exit_command, args=["window"], text="Exit")
         exit_3.width = 20
         exit_3.bg = "red"
