@@ -47,7 +47,7 @@
  float gForceX, gForceY, gForceZ;
  int i = 0;
  int sum = 0;
- int offset = 0;
+ int offset = 0; //offset angle
 
  
 void setup() {
@@ -278,8 +278,9 @@ void processAccelData(){
   sum = sum + bx;
   if (i == 10)
   {
-    Offset =sum/10; 
+    offset =sum/10; 
     i=0;
+    sum = 0;
     }
   
   }
