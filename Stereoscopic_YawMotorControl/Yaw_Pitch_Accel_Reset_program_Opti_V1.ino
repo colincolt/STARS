@@ -11,8 +11,8 @@
  int angle = 0;
  int Speed = 0;
  int oldposition = 0;
- int Barrier =24690;
- int Barrierend = -24690;
+ int Barrier =14000;
+ int Barrierend = -14000;
  long encodercount = 0;
  long newposition = 0;
  Encoder myEnc(2,3);//yellow 3 brown 2, also power red out1 black out2
@@ -29,7 +29,7 @@
  int In3= 12;// Pin 7(Uno) is connected to the motor controller In1 pin
  int In4 = 13;// Pin 8(Uno) is connected to the motor controller In2 pin
  int ENA2 = 11;// Pin 5(Uno) is connected to the motor controller ENA pin
- int ref1 = A0;//Pin A0(Uno) is connected to the linear actuator position signal
+ int ref1 = A0;//Pin A0(Uno) is connected to the linear actuator position signal(blue)
  int last1 = 0;
  int Cposition = 0;
  int Motor2_Speed = 0;
