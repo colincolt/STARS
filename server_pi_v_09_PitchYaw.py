@@ -298,7 +298,7 @@ class PitchYaw(Thread):
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
-                        row = 5 - (int(round(usedDistance / 2)) * 2) - 1        # <<NEED TO FIX THIS LOGIC FOR ROW LOOKUP
+                        row = round((usedDistance-0.99)/2)-2
                         if row < 0: row = 0
                         elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
@@ -363,7 +363,7 @@ class PitchYaw(Thread):
 
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
+                        row = round((usedDistance-0.99)/2)-2
                         if row < 0: row = 0
                         elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
@@ -445,7 +445,7 @@ class PitchYaw(Thread):
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
-                    row = 4 - (int(round(usedDistance / 2)) * 2) - 1
+                    row = round((usedDistance-0.99)/2)-2
                     if row < 0: row = 0
                     elif row > 11: row = 11
                     pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
