@@ -12,7 +12,6 @@ try:
     import cv2
     import imutils
     import io
-    import time
     from picamera.array import PiRGBArray
     from picamera import PiCamera
     import_error = False
@@ -62,7 +61,126 @@ while not connected:  # Wait for client
         print('[Stereo] :       No Client'+str(e))
         time.sleep(3)
         continue
+    
+def ProcessLoop(vs, clientPort, BUFFER_SIZE):
+##________________BEGINNING OF LOOP________________##
+    while True:
+        print("looping")
+        start_time = time.time()
 
+        ## CHANGE THE WAY YOU ACQUIRE IMAGE
+        try:
+            image = vs.read()
+            # image = np.frombuffer(image, dtype=np.uint8)
+            image = imutils.resize(image, width=600, height=450)
+        except AttributeError as e:
+            print("no image")
+            capture = False
+            while not capture:
+                image = vs.read()
+                # image = np.frombuffer(image, dtype=np.uint8)
+                image = imutils.resize(image, width=600, height=450)
+                try:
+                    image = vs.read()
+                    # image = np.frombuffer(image, dtype=np.uint8)
+                    image = imutils.resize(image, width=600, height=450)
+                    capture = True
+                except AttributeError as e:
+                    print("no image")
+                    capture = False
+                    continue
+                except:
+                    print("no image")
+                    break
+
+        
+        blurred = cv2.GaussianBlur(image, (11, 11), 0)
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+
+        mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
+        mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
+        mask = mask0 + mask1
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+
+        # find contours in the mask and initialize the current (x, y) center of the ball
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        center = None
+
+        # only proceed if at least one contour was found
+        if len(cnts) > 0:
+            # find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
+            centroid = (centroid[0] * 2464 / 600, centroid[1] * 2464 / 600)
+
+            # only proceed if the radius meets a minimum size
+            if radius > 0.1:
+                # draw the circle and centroid on the frame, then update the list of tracked points
+                cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                cv2.circle(image, center, 5, (0, 0, 255), -1)
+
+        # update the points queue
+        pts.appendleft(center)
+        
+        #print("test1")
+        # loop over the set of tracked points
+        for i in range(1, len(pts)):
+            # if either of the tracked points are None, ignore
+            # them
+            if pts[i - 1] is None or pts[i] is None:
+                continue
+
+            # otherwise, compute the thickness of the line and draw the connecting lines
+            thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
+            cv2.line(image, pts[i - 1], pts[i], (0, 0, 255), thickness)
+        #print("test2")
+        try:
+            #print('[StereoscopicThread] : waiting for data')
+            print("test1")
+            data = clientPort.recv(BUFFER_SIZE)
+            
+            print("test2")
+            #print("[StereoscopicThread] : received data:", data)
+            clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
+            print("test3")
+            compvalue = data.decode()
+            print(compvalue)
+            print("test4")
+        except socket.error:
+            connected = False
+            while not connected and not shutdown_event.isSet() and not kill_event.isSet():
+                try:
+                    data = clientPort.recv(BUFFER_SIZE)
+                    # print("[StereoscopicThread] : received data:", data)
+                    clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
+                    compvalue = data.decode()
+                    print(compvalue)
+                    connected = True
+                except socket.error:
+                    print("[Stereo] : Lost the client connection")
+                    time.sleep(0.5)
+
+    if len(cnts) > 0:
+        #print("Decoded value: " + compvalue)
+        slaveval = float(compvalue)
+        masterval = centroid[0]
+        disparity = abs(masterval - slaveval)
+        distance = (focalsize * baseline) / (disparity * pixelsize)
+        # SENDS DATA TO Class, which can be "Put" using Stacks's______________________________
+        # results = StereoOutput
+        # results.distance = distance
+        # results.disparity = disparity
+        # results.masterval = masterval
+        # results.slaveval = slaveval
+        # stereoStack.push(results)
+        fps = time.time() - start_time
+        print("[Stereo] :   FPS =  " + str(fps) + "||    Distance:  " + str(distance))
+        
 class PiVideoStream:
     def __init__(self, resolution=(600, 450), framerate=32):
         # initialize the camera and stream
@@ -122,121 +240,8 @@ def stop(self):
 print("[INFO] starting THREADED frames from `picamera` module...")
 
 vs = PiVideoStream().start()
+
+# Allow the camera to warmup:
 time.sleep(2.0)
-##________________BEGINNING OF LOOP________________##
-while True:
-    print("looping")
-    start_time = time.time()
 
-    ## CHANGE THE WAY YOU ACQUIRE IMAGE
-    try:
-        image = vs.read()
-        # image = np.frombuffer(image, dtype=np.uint8)
-        image = imutils.resize(image, width=600, height=450)
-    except AttributeError as e:
-        print("no image")
-        capture = False
-        while not capture:
-            image = vs.read()
-            # image = np.frombuffer(image, dtype=np.uint8)
-            image = imutils.resize(image, width=600, height=450)
-            try:
-                image = vs.read()
-                # image = np.frombuffer(image, dtype=np.uint8)
-                image = imutils.resize(image, width=600, height=450)
-                capture = True
-            except AttributeError as e:
-                print("no image")
-                capture = False
-                continue
-            except:
-                print("no image")
-                break
-
-    
-    blurred = cv2.GaussianBlur(image, (11, 11), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-
-    mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
-    mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
-    mask = mask0 + mask1
-    mask = cv2.erode(mask, None, iterations=2)
-    mask = cv2.dilate(mask, None, iterations=2)
-
-    # find contours in the mask and initialize the current (x, y) center of the ball
-    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
-    center = None
-
-    # only proceed if at least one contour was found
-    if len(cnts) > 0:
-        # find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
-        c = max(cnts, key=cv2.contourArea)
-        ((x, y), radius) = cv2.minEnclosingCircle(c)
-        M = cv2.moments(c)
-        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-        centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
-        centroid = (centroid[0] * 2464 / 600, centroid[1] * 2464 / 600)
-
-        # only proceed if the radius meets a minimum size
-        if radius > 0.1:
-            # draw the circle and centroid on the frame, then update the list of tracked points
-            cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-            cv2.circle(image, center, 5, (0, 0, 255), -1)
-
-    # update the points queue
-    pts.appendleft(center)
-    
-    #print("test1")
-    # loop over the set of tracked points
-    for i in range(1, len(pts)):
-        # if either of the tracked points are None, ignore
-        # them
-        if pts[i - 1] is None or pts[i] is None:
-            continue
-
-        # otherwise, compute the thickness of the line and draw the connecting lines
-        thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
-        cv2.line(image, pts[i - 1], pts[i], (0, 0, 255), thickness)
-    #print("test2")
-    try:
-        #print('[StereoscopicThread] : waiting for data')
-        print("test1")
-        data = clientPort.recv(BUFFER_SIZE)
-        
-        print("test2")
-        #print("[StereoscopicThread] : received data:", data)
-        clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
-        print("test3")
-        compvalue = data.decode()
-        print(compvalue)
-        print("test4")
-    except socket.error:
-        connected = False
-        while not connected and not shutdown_event.isSet() and not kill_event.isSet():
-            try:
-                data = clientPort.recv(BUFFER_SIZE)
-                # print("[StereoscopicThread] : received data:", data)
-                clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
-                compvalue = data.decode()
-                print(compvalue)
-                connected = True
-            except socket.error:
-                print("[Stereo] : Lost the client connection")
-                time.sleep(0.5)
-
-    if len(cnts) > 0:
-        #print("Decoded value: " + compvalue)
-        slaveval = float(compvalue)
-        masterval = centroid[0]
-        disparity = abs(masterval - slaveval)
-        distance = (focalsize * baseline) / (disparity * pixelsize)
-        # SENDS DATA TO Class, which can be "Put" using Stacks's______________________________
-        # results = StereoOutput
-        # results.distance = distance
-        # results.disparity = disparity
-        # results.masterval = masterval
-        # results.slaveval = slaveval
-        # stereoStack.push(results)
-        fps = time.time() - start_time
-        print("[Stereo] :   FPS =  " + str(fps) + "||    Distance:  " + str(distance))
+ProcessLoop(vs, clientPort, BUFFER_SIZE)

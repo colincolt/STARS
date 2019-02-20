@@ -19,7 +19,10 @@ global import_error
 try:
     import cv2
     import imutils
+    import io
     from imutils.video import VideoStream
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
     import_error = False
 except ImportError as imp:
     print("IMPORTANT  :   WITHOUT OPENCV3.0 THE STEREOSCOPICS WILL NOT OPERATE" + str(imp))
@@ -179,14 +182,16 @@ class PitchYaw(Thread):
             # _ARDUINO_UNO__SERIAL_OPEN
             try:
                 # Initialize Arduino UNO
-                UNO = serial.Serial("/dev/uno", 9600)  # change ACM number as found from "ls /dev/tty*"
+                print("before serial")
+                UNO = serial.Serial("/dev/ttyACM1", 9600)  # change ACM number as found from "ls /dev/tty*"
                 UNO.baudrate = 9600
+                print("after serial")
                 # ACQUIRE ACCELEROMETER DATA (Single Pitch reading) _______ #
-                tempAngle = GetUnoData(UNO)
-                launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
+#                tempAngle = GetUnoData(UNO)
+#                launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
                 # Get Temperature Data
-                temperature = self.getTemperatureStack.peek()
-                tempCorrection = temperature / 25  # <<<tempCorrection factor
+                # temperature = self.getTemperatureStack.peek()
+                tempCorrection = 1 #temperature / 25  # <<<tempCorrection factor
 
                 # Get GUI Data
                 guiData = self.getguiStack.peek()
@@ -206,10 +211,8 @@ class PitchYaw(Thread):
                 if self.shutdown_event.isSet():
                     print("SHUTDOWN EVENT RECEIVED")
                     break
-                else:
-                    print("[PitchYaw(Thread)] : starting Loop")
-
-
+                
+        print("[PitchYaw(Thread)] : starting Loop")
 
         while not self.shutdown_event.isSet() and not self.kill_event.isSet():
             # <<< BEGINNING OF PITCHYAW LOOP _________________________________ ** #
@@ -248,7 +251,9 @@ class PitchYaw(Thread):
                             self.shutdown_event.set()
 
                     LeftXcoord = stereodata.masterval
+                    print("LeftXcoord:  "+ str(LeftXcoord))
                     RightXcoord = stereodata.slaveval
+                    print("RightXcoord:   " + str(RightXcoord))
                     stereoDist = int(stereodata.distance)
 
 
@@ -298,17 +303,18 @@ class PitchYaw(Thread):
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
-                        row = round((usedDistance-0.99)/2)-2
+                        row = round(((usedDistance-0.99) / 2) - 2)
                         if row < 0: row = 0
                         elif row > 11: row = 11
-                        pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
-
+                        pitchAngle = pitchAngleTable[row, 1] #+ launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
+                        # print("pitchangle:"+str(pitchAngle))
                         # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
                         latPixelDisp = (2464 - LeftXcoord - RightXcoord)
                         latPixelDisp += (dynamic_pixel_buff / usedDistance)
                         # PICK MOTOR DIRECTION:
                         if (2464 - LeftXcoord < RightXcoord):
                             latPixelDisp = -latPixelDisp
+                            print("FUTURE_DIST: 2464 - LeftXcoord < RightXcoord:")
 
                         # *** If we need to scale down the max speed as the player gets closer (same pixel disp at different distances correspond to different angles)
                         # if usedDistance < 8: usedDistance = 8 (makes sure minimum motorSpeed=80 (8/25 = 0.31 -> 0.31*255=80))
@@ -323,7 +329,8 @@ class PitchYaw(Thread):
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                         # scaled_pid = -+80 at 7.75 m
-
+                        print("PID_output"+str(pid_output)+"scaled_PID"+str(scaled_pid)) 
+                        
                         if scaled_pid == 0:
                             scaled_pid = 0
                         elif (scaled_pid < -255):
@@ -338,8 +345,13 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
-                        data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
+                        UNO.reset_input_buffer()
+                        # UNO.reset_output_buffer()
+                        # UNO.set_output_flow_control(True)
+                        #data = '<' + motorSpeed + ', ' + str(pitchAngle) + '>'
+                        data = "<80,27>"
                         UNO.write(data.encode())
+                        # print(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
                         time.sleep(0.1)
 
@@ -363,7 +375,7 @@ class PitchYaw(Thread):
 
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = round((usedDistance-0.99)/2)-2
+                        row = round(((usedDistance-0.99) / 2) - 2)
                         if row < 0: row = 0
                         elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
@@ -374,6 +386,8 @@ class PitchYaw(Thread):
                         # PICK MOTOR DIRECTION:
                         if (2464 - LeftXcoord < RightXcoord):
                             latPixelDisp = -latPixelDisp
+                            print("FINAL_DIST: 2464 - LeftXcoord < RightXcoord:"+str(latPixelDisp))
+                            
                         # *** If we need to scale down the max speed as the player gets closer (same pixel disp at different distances correspond to different angles)
                         # if usedDistance < 8: usedDistance = 8 (makes sure minimum motorSpeed=80 (8/25 = 0.31 -> 0.31*255=80))
                         # error_scaling = usedDistance / 25  # <<< ERROR SCALING
@@ -387,7 +401,9 @@ class PitchYaw(Thread):
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                         # scaled_pid = -+80 at 7.75 m
-
+                        print("PID_output"+str(pid_output)) 
+                        print("scaled_PID"+str(scaled_pid))
+                        
                         if scaled_pid == 0:
                             scaled_pid = 0
                         elif (scaled_pid < -255):
@@ -402,13 +418,19 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
-                        data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
+                        UNO.reset_input_buffer()
+                        # UNO.reset_output_buffer()
+                        # UNO.set_output_flow_control(True)
+                        #data = '<' + motorSpeed + ', ' + str(pitchAngle) + '>'
+                        data = "<80,27>"
                         UNO.write(data.encode())
+                        # print(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
                         time.sleep(0.1)
+                        
 
                 except Exception as e:
-                    print('[PitchYaw(Thread)] : failed because of exception ' + e)
+                    print('[PitchYaw(Thread)] : NOTHING IN FRAME failed because of exception ' + str(e))
                     continue
 
             if drillType == "Static" or drillType == "Manual":
@@ -445,7 +467,7 @@ class PitchYaw(Thread):
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
-                    row = round((usedDistance-0.99)/2)-2
+                    row = round(((usedDistance-0.99) / 2) - 2)
                     if row < 0: row = 0
                     elif row > 11: row = 11
                     pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
@@ -469,6 +491,7 @@ class PitchYaw(Thread):
                     # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                     scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                     # scaled_pid = -+80 at 7.75 m
+                    print(pid_output)
 
                     if scaled_pid == 0:
                         scaled_pid = 0
@@ -484,8 +507,13 @@ class PitchYaw(Thread):
                     motorSpeed = str(scaled_pid)
 
                     # ** ___ SEND DATA ___ ** #
-                    data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
+                    UNO.reset_input_buffer()
+                    # UNO.reset_output_buffer()
+                    # UNO.set_output_flow_control(True)
+                    #data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
+                    data = "<80,27>"
                     UNO.write(data.encode())
+                    print(data.encode())
                     print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
                     time.sleep(0.1)
                     # ** ____________________________________________________________________ ** #
@@ -493,6 +521,8 @@ class PitchYaw(Thread):
                 except Exception as e:
                     print('[PitchYaw(Thread)] : failed because of exception ' + e)
                     continue
+
+            UNO.set_output_flow_control(False)
 
         if self.shutdown_event.isSet():
             print("[PitchYaw] : STOP BUTTON PRESSED")
@@ -542,9 +572,9 @@ def StereoscopicsThread(stereoStack, shutdown_event, kill_event):
     args = vars(ap.parse_args())
 
     # define the lower and upper boundaries of the jersey ball in the HSV color space, then initialize the list of tracked points
-    jerseyLower1 = (0, 50, 50)  # currently set for red
-    jerseyUpper1 = (5, 255, 255)
-    jerseyLower2 = (175, 50, 50)  # currently set for red
+    jerseyLower1 = (0, 70, 70)  # currently set for red
+    jerseyUpper1 = (10, 255, 255)
+    jerseyLower2 = (170, 70, 70)  # currently set for red
     jerseyUpper2 = (180, 255, 255)
     pts = deque(maxlen=args["buffer"])
 
@@ -553,7 +583,7 @@ def StereoscopicsThread(stereoStack, shutdown_event, kill_event):
 
     vs = VideoStream(src=0, resolution=framesize, framerate=frameRate).start()
 
-    time.sleep(0.1)
+    time.sleep(1)
 
     print('[Stereo] : starting stereo loop')
 
@@ -657,26 +687,27 @@ def GetUnoData(UNO):
     getdata = False
     dataPresent = False
     while getdata == False:
-        print('[PitchYaw(Thread)] : in Mega.Serial while 1')
+        print('[PitchYaw(Thread)] : in UNO.Serial while 1')
         if UNO.is_open:
-            print('[PitchYaw(Thread)] : in the Mega.is_open')
+            print('[PitchYaw(Thread)] : in the UNO.is_open')
             while not dataPresent:
-                print('[PitchYaw(Thread)] : in Mega.Serial while 2')
+                print('[PitchYaw(Thread)] : in UNO.Serial while 2')
+                time.sleep(1)
                 try:
                     print('[PitchYaw(Thread)] : trying to read startMarker')
                     startMarker = UNO.read().decode()
                 except Exception as e:
-                    print('[PitchYaw(Thread)] : didnt get Mega data' + e)
+                    print('[PitchYaw(Thread)] : didnt get UNO data' + e)
                 if startMarker == "<":
                     unoDataStr = UNO.read(15)  # READ DATA FORMATTED AS ('< 1 >')
                     unoDataTemp = list(unoDataStr.decode())
                     unoDataTemp.insert(0, startMarker)
                     unoData = unoDataTemp[:unoDataTemp.index(">") + 1]
-                    print("[PitchYaw(Thread)] : acquired MegaData  ->  ", unoData)
+                    print("[PitchYaw(Thread)] : acquired UNOData  ->  ", unoData)
                     tempData = "".join(unoData)
                     print("[PitchYaw(Thread)] : tempData string  ->  ", tempData)
                     dataPresent = True
-                    print('[PitchYaw(Thread)] : data read from Mega')
+                    print('[PitchYaw(Thread)] : data read from UNO')
                     getdata = True
                     return tempData
         else:
@@ -827,25 +858,25 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                         print("[MainThread] : Waiting for Stereo...")
                         continue
 
-            if 5 <= stereo_Distance <= 30:  # Meters
+            if 1 <= stereo_Distance <= 30:  # Meters
                 rationaleDistMeasures = 1
                 distanceTotal = stereo_Distance
 
                 # Get(NO_WAIT) for Lidar_1_Dist _____________________________
-                try:
-                    LIDAR_1_Distance = Lidar1Dist(evo)
-                    evo.flushOutput()
-                    time.sleep(0.05)
-                    if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-                        rationaleDistMeasures += 1
-                        distanceTotal += LIDAR_1_Distance
-                        lidar1Stack.push(LIDAR_1_Distance)
-                    else:
-                        lidar1Stack.push(None)  # << None value indicates no GOOD new data
+#                try:
+#                    LIDAR_1_Distance = Lidar1Dist(evo)
+#                    evo.flushOutput()
+#                    time.sleep(0.05)
+#                    if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+#                        rationaleDistMeasures += 1
+#                        distanceTotal += LIDAR_1_Distance
+#                        lidar1Stack.push(LIDAR_1_Distance)
+#                    else:
+#                        lidar1Stack.push(None)  # << None value indicates no GOOD new data
 
-                except Exception as w:
-                    print("[MainThread] : LIDAR_1 -> no data" + str(w))
-                    pass
+#                except Exception as w:
+#                    print("[MainThread] : LIDAR_1 -> no data" + str(w))
+#                    pass
 
                 # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
                 try:
@@ -891,7 +922,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                 futureDistStack.push(FUT_FINAL_DIST)
 
             else:
-                print("Player is not in Range")
+                print("[MainThread] : Player is not in Range")
                 # Activate GPIO pin for notification LED
                 # ***Do something about this***
                 time.sleep(0.5)

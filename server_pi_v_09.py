@@ -1329,6 +1329,16 @@ def GetMegaData(MEGA):
                 # print(megaDataStr)
                 time.sleep(0.4)  # < MAYBE IMPORTANT
 
+def findEvo():
+    # Find Live Ports, return port name if found, NULL if not
+    # print ('Scanning all live ports on this PC')
+    ports = list(serial.tools.list_ports.comports())
+    for p in ports:
+        #print p # This causes each port's information to be printed out.
+        if "5740" in p[2]:
+            # print ('Evo found on port ' + p[0])
+            return(p[0])
+    return ('NULL')
 
 def Lidar1Dist(evo):
     while (1):
@@ -1385,7 +1395,8 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
         # ___ OPEN SERIAL PORT/S ___ #
         while not evo_lidar and not shutdown_event.isSet() and not kill_event.isSet():
             try:
-                evo = serial.Serial("/dev/evo", baudrate=115200, timeout=2)
+                port = findEvo()
+                evo = serial.Serial(port, baudrate=115200, timeout=2)
                 set_text = (0x00, 0x11, 0x01, 0x45)
                 evo.flushInput()
                 evo.write(set_text)
