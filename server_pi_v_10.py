@@ -104,7 +104,8 @@ futureDistStack = Stack()
 # GLOBAL FLAGS/EVENTS:
 
 # GLOBAL VARIABLES:
-
+StartPitchYaw = True
+StartLauncher = True
 
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
     # RECEIVE from UNO:
@@ -1513,18 +1514,24 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                 print('[MainThread] : Stereo thread failed because of exception ' + str(e))
 
         time.sleep(4)
-        try:
-            pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack, shutdown_event, kill_event)
-            pitchYawthread.start()
-        except Exception as e:
-            print('[MainThread] : Pitch and Yaw thread didnt start because of exception ' + str(e))
+        if StartPitchYaw:
+            try:
+                pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack, shutdown_event, kill_event)
+                pitchYawthread.start()
+            except Exception as e:
+                print('[MainThread] : pitchYawthread didnt start because of exception ' + str(e))
+        else:
+            print('[MainThread] : pitchYawthread thread is not starting')
+        if StartLauncher:
+            try:
+                startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
+                startLauncherThread.start()
+            except Exception as e:
+                print('[MainThread] : Launcher thread didnt start because of exception ' + str(e))
+                time.sleep(1)
+        else:
+            print('[MainThread] : startLauncherThread thread is not starting')
 
-        try:
-            startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
-            startLauncherThread.start()
-        except Exception as e:
-            print('[MainThread] : Launcher thread didnt start because of exception ' + str(e))
-            time.sleep(1)
 
     if shutdown_event.isSet():
         print("[MainThread] : STOP BUTTON PRESSED")
