@@ -104,9 +104,7 @@ futureDistStack = Stack()
 # GLOBAL FLAGS/EVENTS:
 
 # GLOBAL VARIABLES:
-StartPitchYaw = True
-StartLauncher = True
-EvoLidar = True
+
 
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
     # RECEIVE from UNO:
@@ -1458,7 +1456,7 @@ def Lidar1Dist(evo):
     #
 
 # MAIN FILE START
-def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # , args): ## NOT A THREAD, performs the bulk of calculation
+def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, PitchYawStart, LauncherStart, EvoStart):  # , args): ## NOT A THREAD, performs the bulk of calculation
     # # _______________________________Main Processing_____________________________________
     if not shutdown_event.isSet() and not kill_event.isSet():
         # __ VARIABLES _____#
@@ -1474,6 +1472,10 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
         guiData.speed = speed
         guiData.difficulty = difficulty
         guiData.drilltype = drillType
+
+        StartPitchYaw = PitchYawStart
+        StartLauncher = LauncherStart
+        EvoLidar = EvoStart
         print("[MainThread] : ")
         print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(
             guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
