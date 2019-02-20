@@ -106,6 +106,7 @@ futureDistStack = Stack()
 # GLOBAL VARIABLES:
 StartPitchYaw = True
 StartLauncher = True
+EvoLidar = True
 
 # PITCH_YAW_THREAD: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
     # RECEIVE from UNO:
@@ -1381,8 +1382,8 @@ def GetUnoData(UNO, shutdown_event, kill_event):
                     getdata = True
                     return tempData
         else:
-            continue
             time.sleep(0.1)
+            continue
         time.sleep(0.2)  # << MAY NEED TO BE CHANGED IF READ DATA IS GARBAGE
 
 
@@ -1467,7 +1468,6 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
         lead_time = 3
         z_dist_deque = deque([])
         measure_time_deque = deque([])
-        evo_lidar = False
 
         # __ GUI Input __ #
         guiData = GuiInput
@@ -1481,26 +1481,29 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
 
         guiStack.push(guiData)
         # ___ OPEN SERIAL PORT/S ___ #
-        while not evo_lidar and not shutdown_event.isSet() and not kill_event.isSet():
-            try:
-                port = findEvo()
-                evo = serial.Serial(port, baudrate=115200, timeout=2)
-                set_text = (0x00, 0x11, 0x01, 0x45)
-                evo.flushInput()
-                evo.write(set_text)
-                evo.flushOutput()
-                print("[MainThread] : Connected to Evo (LIDAR1)")
-                evo_lidar = True
-            except serial.SerialException as e:
-                print("[MainThread] : Cannot find Evo LIDAR1" + str(e))
-                time.sleep(2)
-                continue
-            except:
-                print("[MainThread] : Cannot find Evo LIDAR1")
-                time.sleep(2)
-                continue
+        if EvoLidar:
+            evo_data = False
 
-    # ___ Start Threads ___ #
+            while not evo_data and not shutdown_event.isSet() and not kill_event.isSet():
+                try:
+                    port = findEvo()
+                    evo = serial.Serial(port, baudrate=115200, timeout=2)
+                    set_text = (0x00, 0x11, 0x01, 0x45)
+                    evo.flushInput()
+                    evo.write(set_text)
+                    evo.flushOutput()
+                    print("[MainThread] : Connected to Evo (LIDAR1)")
+                    evo_data = True
+                except serial.SerialException as e:
+                    print("[MainThread] : Cannot find Evo LIDAR1" + str(e))
+                    time.sleep(2)
+                    continue
+                except:
+                    print("[MainThread] : Cannot find Evo LIDAR1")
+                    time.sleep(2)
+                    continue
+
+    # _______________________ Start Threads _______________________--_ #
 
     if not shutdown_event.isSet() and not kill_event.isSet():
         print("Starting Threads")
@@ -1513,7 +1516,8 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
             except Exception as e:
                 print('[MainThread] : Stereo thread failed because of exception ' + str(e))
 
-        time.sleep(4)
+        time.sleep(3)
+
         if StartPitchYaw:
             try:
                 pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack, shutdown_event, kill_event)
@@ -1522,6 +1526,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                 print('[MainThread] : pitchYawthread didnt start because of exception ' + str(e))
         else:
             print('[MainThread] : pitchYawthread thread is not starting')
+
         if StartLauncher:
             try:
                 startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
