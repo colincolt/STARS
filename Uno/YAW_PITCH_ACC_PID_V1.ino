@@ -12,7 +12,7 @@
  int Speed = 0;
  int oldposition = 0;
  int Barrier =14000;
- int Barrierend = -14000;
+ //int Barrierend = -14000;
  long encodercount = 0;
  long newposition = 0;
  Encoder myEnc(2,3);//yellow 3 brown 2, also power red out1 black out2
@@ -49,9 +49,11 @@
  int sum = 0;
  int offset = 0; //offset angle
 
- 
+//***Timing
+long displayInterval = 2000;
+long prevDisplayMillis = 0;
 void setup() {
- 
+//Time = millis();
 //***OUTPUT PINS
 //*******Yaw motor output pins
   pinMode(In1,OUTPUT);// Pin 7 is an output 
@@ -78,18 +80,21 @@ void setup() {
   digitalWrite(In2,LOW);
 
   myPID.SetMode(AUTOMATIC);
-  
+//  Time = millis();
 }
 
 void loop() {
 //*** SERIAL COMMUNICATION (turning serial input into integer)
-  Input = map(analogRead(ref1),48,981,0,255);
+  Input = analogRead(ref1);
   recvWithStartEndMarkers();
   if (newData == true) {
     strcpy(tempChars, receivedChars);
     parseData();
     newData = false;}
-  recordAccelRegisters();
+  if (millis() - prevDisplayMillis >= displayInterval) {
+       prevDisplayMillis += displayInterval;
+       recordAccelRegisters();
+   }
   }
 
 void recvWithStartEndMarkers() {
@@ -130,7 +135,8 @@ void parseData() {      // split the data into its parts
     Serial.println(Motor2_Speed);
 
 
-
+    newposition= ((myEnc.read()));// number of countable events seen       
+    int player_angle = newposition/ ((2.96011)*(49.1684)); // players angle from orgin (zero position) 
     
 //********* YAW SECTION
 //*** DIRECTION OF YAW
@@ -143,6 +149,11 @@ void parseData() {      // split the data into its parts
 //*** SPEED OF YAW
     Speed = abs(Motor1_Speed);
     analogWrite(ENA,Speed);
+
+    if (abs(newposition) >= Barrier){
+        Speed = 0;
+        analogWrite(ENA,Speed);}
+        
 //*** RESET FUNCTION
       if (Motor1_Speed == 300){
 
