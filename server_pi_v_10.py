@@ -206,7 +206,7 @@ class PitchYaw(Thread):
 
             finally:
                 if self.shutdown_event.isSet():
-                    print("SHUTDOWN EVENT RECEIVED")
+                    print("PitchYaw(Thread)] : STOP BUTTON PRESSED")
                     break
                 else:
                     print("[PitchYaw(Thread)] : starting Loop")
@@ -320,7 +320,7 @@ class PitchYaw(Thread):
                         # latDispDeque.appendleft(lateralDisplacement)
                         # if len(latDispDeque) > 10:
                         #     latDispDeque.pop()
-
+                        pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -340,6 +340,7 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
+                        UNO.reset_output_buffer()
                         data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                         UNO.write(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -384,7 +385,7 @@ class PitchYaw(Thread):
                         # latDispDeque.appendleft(lateralDisplacement)
                         # if len(latDispDeque) > 10:
                         #     latDispDeque.pop()
-
+                        pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -404,6 +405,7 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
+                        UNO.reset_output_buffer()
                         data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                         UNO.write(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -466,7 +468,7 @@ class PitchYaw(Thread):
                     # latDispDeque.appendleft(lateralDisplacement)
                     # if len(latDispDeque) > 10:
                     #     latDispDeque.pop()
-
+                    pid.update(latPixelDisp)
                     pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                     # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                     scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -486,6 +488,7 @@ class PitchYaw(Thread):
                     motorSpeed = str(scaled_pid)
 
                     # ** ___ SEND DATA ___ ** #
+                    UNO.reset_output_buffer()
                     data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                     UNO.write(data.encode())
                     print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -495,10 +498,16 @@ class PitchYaw(Thread):
                 except Exception as e:
                     print('[PitchYaw(Thread)] : failed because of exception ' + e)
                     continue
+        if startData:
+            UNO.set_output_flow_control(False)
 
         if self.shutdown_event.isSet():
             print("[PitchYaw] : STOP BUTTON PRESSED")
             time.sleep(2)
+            self.shutdown_event.clear()
+            # PitchYaw(self.getstereoStack, self.getguiStack, self.getTemperatureStack, self.getmegaDataStack, self.getfinalDistStack,
+            #      self.getfutureDistStack, self.shutdown_event, self.kill_event)
+
         elif self.kill_event.isSet():
             print("[PitchYaw] : EXITING...")
             sys.exit()
@@ -748,6 +757,7 @@ class Launcher(Thread):
 
                     # ____________________ Write data to MEGA ____________________
                     try:
+                        MEGA.reset_output_buffer()
                         MEGA.write(data.encode())
                         print("[Launcher(Thread)] : Launch motors starting...")
                     except Exception as e:
@@ -781,6 +791,7 @@ class Launcher(Thread):
                         # write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -819,6 +830,7 @@ class Launcher(Thread):
                         # Write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -974,6 +986,7 @@ class Launcher(Thread):
                         sendsuccess = False
                         while not sendsuccess and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -1102,11 +1115,13 @@ class Launcher(Thread):
 
                     # ____________________ Write data to MEGA ____________________
                     try:
+                        MEGA.reset_output_buffer()
                         MEGA.write(data.encode())
                     except Exception as e:
                         sendsuccess = False
                         while not sendsuccess and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 sendsuccess = True
                             except:
@@ -1116,12 +1131,19 @@ class Launcher(Thread):
             except Exception as e:
                 print('[Launcher(Thread)] : failed because of exception: ' + e)
                 self.shutdown_event.set()
+
+            if startData:
+                MEGA.set_output_flow_control(False)
             # except:   # <-- put as many as needed, order is important
             # else:     # <-- Runs if no exception raised
             # finally:  # <-- Runs no matter what
         if self.shutdown_event.isSet():
             print("[Launcher(Thread)] : STOP BUTTON PRESSED")
             time.sleep(2)
+            self.shutdown_event.clear()
+            # Launcher(self.sendMegaDataStack, self.sendLidar2Stack, self.guiStack, self.getStereoStack, self.getLidar1Stack, self.sendfinalDistStack,
+            #      self.sendTemperatureStack, self.getfutureDist, self.shutdown_event, self.kill_event)
+
         elif self.kill_event.isSet():
             print("[Launcher(Thread)] : EXITING...")
             sys.exit()
@@ -1361,6 +1383,9 @@ def GetUnoData(UNO, shutdown_event, kill_event):
         if UNO.is_open:
             #print('[GetUnoData] : in the UNO is_open')
             while not dataPresent and not shutdown_event.isSet() and not kill_event.isSet():
+
+                UNO.reset_input_buffer()
+
                 print('[GetUnoData] : in UNO Serial while 2')
                 try:
                     print('[GetUnoData] : trying to read startMarker')
@@ -1394,6 +1419,9 @@ def GetMegaData(MEGA, shutdown_event, kill_event):
         if MEGA.is_open:
             print('[GetMegaData] : in the Mega is_open')
             while not dataPresent and not shutdown_event.isSet() and not kill_event.isSet():
+
+                MEGA.reset_input_buffer()
+
                 print('[GetMegaData] : in Mega Serial while 2')
                 try:
                     print('[GetMegaData] : trying to read startMarker')
@@ -1476,6 +1504,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
         StartPitchYaw = PitchYawStart
         StartLauncher = LauncherStart
         EvoLidar = EvoStart
+
         print("[MainThread] : ")
         print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(
             guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
@@ -1585,20 +1614,21 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
                 distanceTotal = stereo_Distance
 
                 # Get(NO_WAIT) for Lidar_1_Dist _____________________________
-                try:
-                    LIDAR_1_Distance = Lidar1Dist(evo)
-                    evo.flushOutput()
-                    time.sleep(0.05)
-                    if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-                        rationaleDistMeasures += 1
-                        distanceTotal += LIDAR_1_Distance
-                        lidar1Stack.push(LIDAR_1_Distance)
-                    else:
-                        lidar1Stack.push(None)  # << None value indicates no GOOD new data
+                if EvoLidar:
+                    try:
+                        LIDAR_1_Distance = Lidar1Dist(evo)
+                        evo.flushOutput()
+                        time.sleep(0.05)
+                        if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                            rationaleDistMeasures += 1
+                            distanceTotal += LIDAR_1_Distance
+                            lidar1Stack.push(LIDAR_1_Distance)
+                        else:
+                            lidar1Stack.push(None)  # << None value indicates no GOOD new data
 
-                except Exception as w:
-                    print("[MainThread] : LIDAR_1 -> no data" + str(w))
-                    pass
+                    except Exception as w:
+                        print("[MainThread] : LIDAR_1 -> no data" + str(w))
+                        pass
 
                 # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
                 try:
@@ -1644,7 +1674,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
                 futureDistStack.push(FUT_FINAL_DIST)
 
             else:
-                print("Player is not in Range")
+                print("[MainThread] : Player is not in Range")
                 # Activate GPIO pin for notification LED
                 # ***Do something about this***
                 time.sleep(0.5)
