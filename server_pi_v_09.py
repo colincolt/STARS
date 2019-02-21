@@ -14,6 +14,7 @@
 from collections import deque
 import numpy as np
 import argparse
+import io
 import time
 import socket
 
@@ -21,7 +22,8 @@ global import_error
 try:
     import cv2
     import imutils
-    from imutils.video import VideoStream
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
     import_error = False
 except ImportError as imp:
     print("IMPORTANT  :   WITHOUT OPENCV3.0 THE STEREOSCOPICS WILL NOT OPERATE" + str(imp))
@@ -137,6 +139,7 @@ class PitchYaw(Thread):
         self.shutdown_event = shutdown_event
         self.kill_event = kill_event
 
+
     def run(self):
         # ** __ RECORD A LIST OF OLD MEASUREMENTS FOR TRACKING: __ ** #
         dist_deque = deque([])
@@ -174,19 +177,23 @@ class PitchYaw(Thread):
         pid.setSampleTime(0.15)
         latPixelDisp = 0
         dynamic_pixel_buff = 1000  # (1000/Distance = 200 px max) increase the pixel 'displacement' error that is fed to PID,
-
+        launcherAngle = 0
+        
+        print("[PitchYawThread] : Starting")
+        
         while not startData and not self.shutdown_event.isSet() and not self.kill_event.isSet():
             # _ARDUINO_UNO__SERIAL_OPEN
             try:
                 # Initialize Arduino UNO
-                UNO = serial.Serial("/dev/uno", 9600)  # change ACM number as found from "ls /dev/tty*"
+                uno_port = findUNO()
+                UNO = serial.Serial(uno_port, 9600)  # change ACM number as found from "ls /dev/tty*"
                 UNO.baudrate = 9600
                 # ACQUIRE ACCELEROMETER DATA (Single Pitch reading) _______ #
-                tempAngle = GetUnoData(UNO)
-                launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
+                #tempAngle = GetUnoData(UNO, self.shutdown_event, self.kill_event)
+                #launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
                 # Get Temperature Data
-                temperature = self.getTemperatureStack.peek()
-                tempCorrection = temperature / 25  # <<<tempCorrection factor
+                # temperature = self.getTemperatureStack.peek()
+                tempCorrection = 1# temperature / 25  # <<<tempCorrection factor
 
                 # Get GUI Data
                 guiData = self.getguiStack.peek()
@@ -204,24 +211,30 @@ class PitchYaw(Thread):
 
             finally:
                 if self.shutdown_event.isSet():
-                    print("SHUTDOWN EVENT RECEIVED")
+                    print("PitchYaw(Thread)] : STOP BUTTON PRESSED")
                     break
                 else:
                     print("[PitchYaw(Thread)] : starting Loop")
+                    
+        print("[PitchYawThread] : Starting")
+
 
 
 
         while not self.shutdown_event.isSet() and not self.kill_event.isSet():
             # <<< BEGINNING OF PITCHYAW LOOP _________________________________ ** #
-            MEGAdata = self.getmegaDataStack.peek()
-            voiceCommand = MEGAdata.voicecommand
+#            MEGAdata = self.getmegaDataStack.peek()
+#            voiceCommand = MEGAdata.voicecommand
 
-            while voiceCommand != "beginVC" and not self.shutdown_event.isSet() and not self.kill_event.isSet():
-                try:
-                    MEGAdata = self.getmegaDataStack.peek()
-                    voiceCommand = MEGAdata.voicecommand  # voice commands = int(from 1 to 5)
-                except:
-                    time.sleep(0.5)
+#            while not self.shutdown_event.isSet() and not self.kill_event.isSet(): #voiceCommand != "beginVC" and
+#                try:
+#                    MEGAdata = self.getmegaDataStack.peek()
+#                    voiceCommand = MEGAdata.voicecommand  # voice commands = int(from 1 to 5)
+#                except AttributeError as novoice:
+#                    print("[PitchYaw] : No VoiceCommand" + str(novoice))
+#                    time.sleep(0.5)
+#                except Exception as e:
+#                    print("[PitchYaw] : Exception" + str(e))
 
             start_time = time.time()
 
@@ -231,9 +244,19 @@ class PitchYaw(Thread):
             else:
                 temp_time = last_start_time - start_time
                 measure_time_deque.appendleft(temp_time)
+                print(measure_time_deque)
                 if len(measure_time_deque) > avg_measure:
                     measure_time_deque.pop()
                 first_measure = False
+                
+            if len(measure_time_deque) >= 2 and len(dist_deque) >= 2:
+                displacement = dist_deque[len(dist_deque)-1] - dist_deque[len(dist_deque)-2]
+                changein_time = measure_time_deque[len(measure_time_deque)-1] - measure_time_deque[len(measure_time_deque)-2]
+                Check_speed = displacement / changein_time
+                print("Check Speed" + str(Check_speed))
+                if Check_speed >= 4: #might need to pop both points 
+                    measure_time_deque.pop(len(measure_time_deque)-1)
+                    dist_deque.pop(len(dist_deque)-1)
             # ________________________________________________________________________ ##
 
             if drillType == "Dynamic":
@@ -242,14 +265,17 @@ class PitchYaw(Thread):
                     while not cameradata and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                         try:
                             stereodata = self.getstereoStack.peek()
+                            LeftXcoord = stereodata.masterval
+                            RightXcoord = stereodata.slaveval
+                            stereoDist = int(stereodata.distance)
                             cameradata = True
                         except:  # EmptyStackError # <- return EmptyStackError if Stack is empty in peek #####!!!!!!!
                             print("[PithYaw(Thread)] : no data in stereoStack")
-                            self.shutdown_event.set()
+                            time.sleep(2)
+                            continue
+    
 
-                    LeftXcoord = stereodata.masterval
-                    RightXcoord = stereodata.slaveval
-                    stereoDist = int(stereodata.distance)
+                    
 
 
                     # Try for FUT_FINAL_DIST _______________
@@ -298,7 +324,7 @@ class PitchYaw(Thread):
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
                         # Query table for angle at usedDistance
-                        row = 5 - (int(round(usedDistance / 2)) * 2) - 1
+                        row = round((usedDistance-0.99)/2)-2
                         if row < 0: row = 0
                         elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
@@ -318,7 +344,8 @@ class PitchYaw(Thread):
                         # latDispDeque.appendleft(lateralDisplacement)
                         # if len(latDispDeque) > 10:
                         #     latDispDeque.pop()
-
+                        
+                        pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -338,6 +365,7 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
+                        UNO.reset_output_buffer()
                         data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                         UNO.write(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -363,7 +391,7 @@ class PitchYaw(Thread):
 
                         # ** ________________________PITCH ANGLE: ______________________ ** #
                         # Query table for angle at usedDistance
-                        row = 4 - (int(round(usedDistance / 2)) * 2) - 1  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
+                        row = round((usedDistance-0.99)/2)-2  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
                         if row < 0: row = 0
                         elif row > 11: row = 11
                         pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
@@ -382,7 +410,7 @@ class PitchYaw(Thread):
                         # latDispDeque.appendleft(lateralDisplacement)
                         # if len(latDispDeque) > 10:
                         #     latDispDeque.pop()
-
+                        pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                         scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -402,6 +430,7 @@ class PitchYaw(Thread):
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
+                        UNO.reset_output_buffer()
                         data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                         UNO.write(data.encode())
                         print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -445,7 +474,7 @@ class PitchYaw(Thread):
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
                     # Query table for angle at usedDistance
-                    row = 4 - (int(round(usedDistance / 2)) * 2) - 1
+                    row = round((usedDistance-0.99)/2)-2
                     if row < 0: row = 0
                     elif row > 11: row = 11
                     pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
@@ -464,7 +493,7 @@ class PitchYaw(Thread):
                     # latDispDeque.appendleft(lateralDisplacement)
                     # if len(latDispDeque) > 10:
                     #     latDispDeque.pop()
-
+                    pid.update(latPixelDisp)
                     pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                     # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
                     scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
@@ -484,6 +513,7 @@ class PitchYaw(Thread):
                     motorSpeed = str(scaled_pid)
 
                     # ** ___ SEND DATA ___ ** #
+                    UNO.reset_output_buffer()
                     data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                     UNO.write(data.encode())
                     print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
@@ -493,10 +523,16 @@ class PitchYaw(Thread):
                 except Exception as e:
                     print('[PitchYaw(Thread)] : failed because of exception ' + e)
                     continue
+        if startData:
+            UNO.set_output_flow_control(False)
 
         if self.shutdown_event.isSet():
             print("[PitchYaw] : STOP BUTTON PRESSED")
             time.sleep(2)
+            self.shutdown_event.clear()
+            # PitchYaw(self.getstereoStack, self.getguiStack, self.getTemperatureStack, self.getmegaDataStack, self.getfinalDistStack,
+            #      self.getfutureDistStack, self.shutdown_event, self.kill_event)
+
         elif self.kill_event.isSet():
             print("[PitchYaw] : EXITING...")
             sys.exit()
@@ -551,6 +587,8 @@ class Launcher(Thread):
         startData = False
         MegaData = MegaDataClass
         arduino_data = False
+        voiceCommand = 0
+        diff_time = [0.3, 0.15, 0, -0.15, -0.3]
 
         # LAUNCHER OPTIONS:
         DYNAMIC_WAIT_TIME = 3
@@ -562,10 +600,11 @@ class Launcher(Thread):
                 # _____ open MEGA serial port
                 while not arduino_data and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                     try:
-                        MEGA = serial.Serial('/dev/mega', 9600)
+                        mega_port = findMEGA()
+                        MEGA = serial.Serial(mega_port, 115200)
                         MEGA.timeout = None
                         print("[Launcher(Thread)] : Connected to MEGA")
-                        getMegaData = GetMegaData(MEGA)
+                        tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                         arduino_data = True
                     except serial.SerialException as err:
                         print("[Launcher(Thread)] : Arduino MEGA not available" + str(err))
@@ -573,8 +612,8 @@ class Launcher(Thread):
                         continue
 
                 # Get TEMPERATURE and voiceCommand --> send to PITCH_YAW Thread
-                temperature = int(getMegaData.strip().split(",")[1])  # temperature = int()
-                voiceCommand = int(getMegaData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
+                temperature = int(tempData.strip().split(",")[1])  # temperature = int()
+                voiceCommand = int(tempData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
                 MegaData.temperature = temperature
                 MegaData.voiceCommand = voiceCommand
                 self.sendTemperatureStack.push(temperature)
@@ -592,8 +631,8 @@ class Launcher(Thread):
                 # print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
 
                 while voiceCommand != beginVC and not self.shutdown_event.isSet() and not self.kill_event.isSet():
-                    getMegaData = GetMegaData()
-                    voiceCommand = int(getMegaData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
+                    tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
+                    voiceCommand = int(tempData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
                     time.sleep(0.5)
 
             except serial.SerialException as err:
@@ -604,11 +643,9 @@ class Launcher(Thread):
                 self.shutdown_event.set()
                 continue
             else:
-                print("[Launcher(Thread)] : Setup Complete")
+                print("[Launcher(Thread)] : Setup Complete, Starting LOOP")
                 startData = True
 
-        print("[Launcher(Thread)] : Starting LOOP")
-        voiceCommand = 0
 
         while drillCount <= 5 and not self.shutdown_event.isSet() and not self.kill_event.isSet():
             try:
@@ -647,7 +684,7 @@ class Launcher(Thread):
 
                     # _______ RECEIVE MEGA DATA STRING (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
                     try:
-                        tempData = GetMegaData
+                        tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                     except serial.SerialException as err:
                         print("[Launcher(Thread)] : MEGA not detected" + err)
                     except Exception as e:  # (serial.SerialException)
@@ -655,7 +692,7 @@ class Launcher(Thread):
                         success = False
                         while not success and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
-                                tempData = GetMegaData
+                                tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                                 success = True
                             except Exception as r:
                                 print("[Launcher(Thread)] : GetMegaData failed" + r)
@@ -717,13 +754,21 @@ class Launcher(Thread):
                         print("[Launcher(Thread)] : LIDAR_1 -> nothing in Lidar1Stack" + str(stackemp))
                         pass
 
+
+
+
                     # CALCULATE AND SEND TOTAL TO MAIN THREAD
                     FINAL_DIST = distanceTotal / rationaleDistMeasures
                     self.sendfinalDistStack.push(FINAL_DIST)
 
+                    # CALCULATE THE ESTIMATE TOF:
+                    difficulty_time = diff_time[difficulty-1]
+                    estimated_tof = 0.120617 * FINAL_DIST + difficulty_time
+
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                     RPM = -1.13635244 * FINAL_DIST ^ 2 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
+                    MOTOR_FREQ = RPM * 0.016666666666667
                     motorSpeed1, motorSpeed2 = round((RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                     # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
@@ -734,10 +779,11 @@ class Launcher(Thread):
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 0
                     data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(
-                        difficulty) + ',' + str(ballFeed) + '>'
+                        difficulty) + ',' + str(ballFeed) + ','+ str(estimated_tof) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
+                        MEGA.reset_output_buffer()
                         MEGA.write(data.encode())
                         print("[Launcher(Thread)] : Launch motors starting...")
                     except Exception as e:
@@ -767,10 +813,11 @@ class Launcher(Thread):
                     if FUT_FINAL_DIST is None or FUT_FINAL_DIST == OLD_FUT_FINAL_DIST:  # <- no prediction is doen  in this thread so it will send AS IS
                         ballFeed = 1
                         data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(
-                            difficulty) + ',' + str(ballFeed) + '>'
+                            difficulty) + ',' + str(ballFeed) + str(estimated_tof) +  '>'
                         # write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -797,18 +844,19 @@ class Launcher(Thread):
 
                         # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                         RPM = -1.13635244 * FUT_FINAL_DIST ^ 2 + 97.7378699 * FUT_FINAL_DIST + 646.034298  # <-- Polynomial fit
-                        motorSpeed1, motorSpeed2 = round(
-                            (RPM / 5000) * 255)  # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
+                        MOTOR_FREQ = RPM * 0.016666666666667
+                        motorSpeed1, motorSpeed2 = round((RPM / 5000) * 255)  # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                         # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
                         MotorSpeed1 = str(motorSpeed1)
                         MotorSpeed2 = str(motorSpeed2)
                         # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                         ballFeed = 1
-                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                        data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + ','+ str(estimated_tof) + '>'
                         # Write data to MEGA
                         if (time.time() - startTime) <= 1:
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -866,7 +914,7 @@ class Launcher(Thread):
 
                     # _______ RECEIVE MEGA DATA STRING (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
                     try:
-                        tempData = GetMegaData
+                        tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                     except serial.SerialException as err:
                         print("[Launcher(Thread)] : MEGA not detected" + err)
                     except Exception as e:  # (serial.SerialException)
@@ -874,7 +922,7 @@ class Launcher(Thread):
                         success = False
                         while not success and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
-                                tempData = GetMegaData
+                                tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                                 success = True
                             except Exception as r:
                                 print("[Launcher(Thread)] : GetMegaData failed" + r)
@@ -938,9 +986,13 @@ class Launcher(Thread):
                     FINAL_DIST = distanceTotal / rationaleDistMeasures
                     self.sendfinalDistStack.push(FINAL_DIST)
 
+                    difficulty_time = diff_time[difficulty-1]
+                    estimated_tof = 0.120617 * FINAL_DIST + difficulty_time
+
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                     RPM = -1.13635244 * FINAL_DIST ^ 2 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
+                    MOTOR_FREQ = RPM * 0.016666666666667
                     motorSpeed1, motorSpeed2 = round(
                         (RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
 
@@ -951,7 +1003,7 @@ class Launcher(Thread):
                     targetChoice = int(random.choice([1, 2, 3, 4]))
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 1
-                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + ',' + str(estimated_tof) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
@@ -960,6 +1012,7 @@ class Launcher(Thread):
                         sendsuccess = False
                         while not sendsuccess and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 drillCount += 1  # << ON SUCCESSFUL LAUNCH
                                 LaunchTime = time.time()
@@ -997,7 +1050,7 @@ class Launcher(Thread):
 
                         # _______ RECEIVE MEGA DATA STRING (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
                         try:
-                            tempData = GetMegaData
+                            tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                         except serial.SerialException as err:
                             print("[Launcher(Thread)] : MEGA not detected" + err)
                         except Exception as e:  # (serial.SerialException)
@@ -1005,7 +1058,7 @@ class Launcher(Thread):
                             success = False
                             while not success and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                                 try:
-                                    tempData = GetMegaData
+                                    tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                                     success = True
                                 except Exception as r:
                                     print("[Launcher(Thread)] : GetMegaData failed" + str(r))
@@ -1068,11 +1121,14 @@ class Launcher(Thread):
                     FINAL_DIST = distanceTotal / rationaleDistMeasures
                     self.sendfinalDistStack.push(FINAL_DIST)
 
+                    difficulty_time = diff_time[difficulty-1]
+                    estimated_tof = 0.120617 * FINAL_DIST + difficulty_time
+
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                     RPM = -1.13635244 * FINAL_DIST ^ 2 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
-                    motorSpeed1, motorSpeed2 = round(
-                        (RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
+                    MOTOR_FREQ = RPM * 0.016666666666667
+                    motorSpeed1, motorSpeed2 = round((RPM / 5000) * 255)  # * tempCorrect?  # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                     # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
                     MotorSpeed1 = str(motorSpeed1)
@@ -1081,15 +1137,17 @@ class Launcher(Thread):
                     targetChoice = int(random.choice([1, 2, 3, 4]))
                     # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 1
-                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + '>'
+                    data = '<' + MotorSpeed1 + ',' + MotorSpeed2 + ',' + str(targetChoice) + ',' + str(difficulty) + ',' + str(ballFeed) + ','+ str(estimated_tof) + '>'
 
                     # ____________________ Write data to MEGA ____________________
                     try:
+                        MEGA.reset_output_buffer()
                         MEGA.write(data.encode())
                     except Exception as e:
                         sendsuccess = False
                         while not sendsuccess and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                             try:
+                                MEGA.reset_output_buffer()
                                 MEGA.write(data.encode())
                                 sendsuccess = True
                             except:
@@ -1099,12 +1157,17 @@ class Launcher(Thread):
             except Exception as e:
                 print('[Launcher(Thread)] : failed because of exception: ' + e)
                 self.shutdown_event.set()
-            # except:   # <-- put as many as needed, order is important
-            # else:     # <-- Runs if no exception raised
-            # finally:  # <-- Runs no matter what
+
+            if startData:
+                MEGA.set_output_flow_control(False)
+            t
         if self.shutdown_event.isSet():
             print("[Launcher(Thread)] : STOP BUTTON PRESSED")
             time.sleep(2)
+            self.shutdown_event.clear()
+            # Launcher(self.sendMegaDataStack, self.sendLidar2Stack, self.guiStack, self.getStereoStack, self.getLidar1Stack, self.sendfinalDistStack,
+            #      self.sendTemperatureStack, self.getfutureDist, self.shutdown_event, self.kill_event)
+
         elif self.kill_event.isSet():
             print("[Launcher(Thread)] : EXITING...")
             sys.exit()
@@ -1116,36 +1179,19 @@ class Launcher(Thread):
 
 
 def StereoscopicsThread(stereoStack, shutdown_event, kill_event):
-    # print('Starting Stereoscopics THREAD')
     focalsize = 3.04e-03
     pixelsize = 1.12e-06
     baseline = 0.737
-    datapoints = 5
-    centroid = (0, 0)
-    compvalue = 1
+    # datapoints = 5
+    # centroid = (0, 0)
+    # compvalue = "1.0"
 
-    ##________________Sockets TCP/IP Communication__________________________________###########
-
+    shutdown_event = shutdown_event
+    kill_event =kill_event
     TCP_IP = '169.254.116.12'
     TCP_PORT = 5025
     BUFFER_SIZE = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    connected = False
-    while not connected and not shutdown_event.isSet() and not kill_event.isSet():  # Wait for client
-        try:
-            s.bind((TCP_IP, TCP_PORT))
-            s.listen(1)
-            # sock.settimeout(5)
-            clientPort, addr = s.accept()
-            connected = True
-            print("[Stereo] : Client connected")
-        except socket.error:
-            print('[Stereo] :       No Client')
-            time.sleep(3)
-            continue
-
-    connected = True
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-v", "--video", help="path to the (optional) video file")
@@ -1153,181 +1199,290 @@ def StereoscopicsThread(stereoStack, shutdown_event, kill_event):
     args = vars(ap.parse_args())
 
     # define the lower and upper boundaries of the jersey ball in the HSV color space, then initialize the list of tracked points
-    jerseyLower1 = (0, 50, 50)  # currently set for red
-    jerseyUpper1 = (5, 255, 255)
-    jerseyLower2 = (175, 50, 50)  # currently set for red
+    jerseyLower1 = (0, 70, 70)  # currently set for red
+    jerseyUpper1 = (10, 255, 255)
+    jerseyLower2 = (170, 70, 70)  # currently set for red
     jerseyUpper2 = (180, 255, 255)
     pts = deque(maxlen=args["buffer"])
-
-    frameRate = 10
-    framesize = (600, 450)
-
-    vs = VideoStream(src=0, resolution=framesize, framerate=frameRate).start()
-
-    time.sleep(0.1)
-
-    print('[Stereo] : starting stereo loop')
-
-
-    ##________________BEGINNING OF LOOP________________##
-    while not shutdown_event.isSet() and not kill_event.isSet():
-        start_time = time.time()
-
-        image = vs.read()
-
-        blurred = cv2.GaussianBlur(image, (11, 11), 0)
-        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-
-        mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
-        mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
-        mask = mask0 + mask1
-        mask = cv2.erode(mask, None, iterations=2)
-        mask = cv2.dilate(mask, None, iterations=2)
-
-        # find contours in the mask and initialize the current (x, y) center of the ball
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-        center = None
-
-        # only proceed if at least one contour was found
-        if len(cnts) > 0:
-            # find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
-            c = max(cnts, key=cv2.contourArea)
-            ((x, y), radius) = cv2.minEnclosingCircle(c)
-            M = cv2.moments(c)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
-            centroid = (centroid[0] * 2464 / 600, centroid[1] * 2464 / 600)
-
-            # only proceed if the radius meets a minimum size
-            if radius > 0.1:
-                # draw the circle and centroid on the frame, then update the list of tracked points
-                cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-                cv2.circle(image, center, 5, (0, 0, 255), -1)
-
-        # update the points queue
-        pts.appendleft(center)
-
-        # loop over the set of tracked points
-        for i in range(1, len(pts)):
-            # if either of the tracked points are None, ignore
-            # them
-            if pts[i - 1] is None or pts[i] is None:
-                continue
-
-            # otherwise, compute the thickness of the line and draw the connecting lines
-            thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
-            cv2.line(image, pts[i - 1], pts[i], (0, 0, 255), thickness)
-
+    frame_width = 800
+    frame_height = 600
+    resolution = (frame_width, frame_height)
+    framerate = 32
+    
+    connected = False
+    print('[Stereo] :       before connection loop')
+    while not connected and not shutdown_event.isSet() and not kill_event.isSet():  # Wait for client
         try:
-            #print('[StereoscopicThread] : waiting for data')
-            data = clientPort.recv(BUFFER_SIZE)
-            #print("[StereoscopicThread] : received data:", data)
-            clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
-            compvalue = data.decode()
+            s.bind((TCP_IP, TCP_PORT))
+            s.listen(1)
+            clientPort, addr = s.accept()
+            connected = True
+            print("[Stereo] : Client connected")
         except socket.error:
-            connected = False
-            while not connected and not shutdown_event.isSet() and not kill_event.isSet():
-                try:
-                    data = clientPort.recv(BUFFER_SIZE)
-                    # print("[StereoscopicThread] : received data:", data)
-                    clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
-                    compvalue = data.decode()
-                    connected = True
-                except socket.error:
-                    print("[Stereo] : Lost the client connection")
-                    time.sleep(0.5)
+            print('[Stereo] :       No Client')
+            time.sleep(3)
+            continue
+        except Exception as e:
+            print('[Stereo] :       No Client' + str(e))
+            time.sleep(3)
+            continue
 
-        if len(cnts) > 0:
-            # print("Decoded value: " + compvalue)
-            slaveval = float(compvalue)
-            masterval = centroid[0]
-            disparity = abs(masterval - slaveval)
-            distance = (focalsize * baseline) / (disparity * pixelsize)
-            # SENDS DATA TO Class, which can be "Put" using Stacks's______________________________
-            results = StereoOutput
-            results.distance = distance
-            results.disparity = disparity
-            results.masterval = masterval
-            results.slaveval = slaveval
-            stereoStack.push(results)
-            fps = time.time() - start_time
-            print("[Stereo] :   FPS =  " + str(fps) + "||    Distance:  " + str(distance))
+    def ProcessLoop(vs, clientPort, BUFFER_SIZE):
+        ##________________BEGINNING OF LOOP________________##
+        while not shutdown_event.isSet() and not kill_event.isSet():
+            print("looping")
+            start_time = time.time()
 
-    if shutdown_event.isSet():
-        print("[Stereo] : STOP BUTTON PRESSED")
-        time.sleep(2)
-    elif kill_event.isSet():
-        print("[Stereo] : EXITING...")
-        sys.exit()
-    else:
-        print("[Stereo] : Not sure what went wrong")
+            try:
+                image = vs.read()
+                image = imutils.resize(image, width=frame_width, height=frame_height)
+            except AttributeError as e:
+                print("[Stereo.ProcessLoop] : no image")
+                capture = False
+                while not capture and not shutdown_event.isSet() and not kill_event.isSet():
+                    image = vs.read()
+                    image = imutils.resize(image, width=frame_width, height=frame_height)
+                    try:
+                        image = vs.read()
+                        image = imutils.resize(image, width=frame_width, height=frame_height)
+                        capture = True
+                    except AttributeError as e:
+                        print("[Stereo.ProcessLoop] : no image")
+                        capture = False
+                        continue
+                    except:
+                        PiVideoStream().stop()
+                        shutdown_event.set()
+
+            blurred = cv2.GaussianBlur(image, (11, 11), 0)
+            hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+
+            mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
+            mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
+            mask = mask0 + mask1
+            mask = cv2.erode(mask, None, iterations=2)
+            mask = cv2.dilate(mask, None, iterations=2)
+
+            # find contours in the mask and initialize the current (x, y) center of the ball
+            cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            center = None
+
+            # only proceed if at least one contour was found
+            if len(cnts) > 0:
+                # find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
+                c = max(cnts, key=cv2.contourArea)
+                ((x, y), radius) = cv2.minEnclosingCircle(c)
+                M = cv2.moments(c)
+                center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+                centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
+                centroid = (centroid[0] * 2464 / 800, centroid[1] * 2464 / 800)
+
+                # only proceed if the radius meets a minimum size
+                if radius > 0.1:
+                    # draw the circle and centroid on the frame, then update the list of tracked points
+                    cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                    cv2.circle(image, center, 5, (0, 0, 255), -1)
+
+            # update the points queue
+            pts.appendleft(center)
+
+            # loop over the set of tracked points
+            for i in range(1, len(pts)):
+                # if either of the tracked points are None, ignore
+                # them
+                if pts[i - 1] is None or pts[i] is None:
+                    continue
+
+                # otherwise, compute the thickness of the line and draw the connecting lines
+                thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
+                cv2.line(image, pts[i - 1], pts[i], (0, 0, 255), thickness)
+            try:
+                # print('[StereoscopicThread] : waiting for data')
+                data = clientPort.recv(BUFFER_SIZE)
+               # print("[StereoscopicThread] : received data:", data)
+                clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
+                compvalue = data.decode()
+            except socket.error:
+                connected = False
+                while not connected and not shutdown_event.isSet() and not kill_event.isSet():
+                    try:
+                        data = clientPort.recv(BUFFER_SIZE)
+                        # print("[StereoscopicThread] : received data:", data)
+                        clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
+                        compvalue = data.decode()
+                        print(compvalue)
+                        connected = True
+                    except socket.error:
+                        print("[Stereo] : Lost the client connection")
+                        time.sleep(0.5)
+                        continue
+
+            if len(cnts) > 0:
+                # print("Decoded value: " + compvalue)
+                slaveval = float(compvalue)
+                masterval = centroid[0]
+                disparity = abs(masterval - slaveval)
+                distance = (focalsize * baseline) / (disparity * pixelsize)
+                # SENDS DATA TO Class, which can be "Put" using Stacks's______________________________
+                results = StereoOutput
+                results.distance = distance
+                results.disparity = disparity
+                results.masterval = masterval
+                results.slaveval = slaveval
+                stereoStack.push(results)
+                fps = time.time() - start_time
+                print("[Stereo] :   FPS =  " + str(fps) + "||    Distance:  " + str(distance))
+                
+        if shutdown_event.isSet() or kill_event.isSet():
+#            PiVideoStream().stream.close()
+#            PiVideoStream().rawCapture.close()
+#            PiVideoStream().camera.close()
+            print('[PiVideoStream] : Closing Camera...')
+            PiVideoStream(shutdown_event, kill_event).stop()
 
 
-def GetUnoData(UNO):
+    class PiVideoStream:
+        def __init__(self, shutdown_event, kill_event, framerate=32, resolution =(frame_width, frame_height)):
+            # initialize the camera and stream
+            self.camera = PiCamera()
+            self.camera.resolution = resolution
+            self.camera.framerate = framerate
+            self.rawCapture = PiRGBArray(self.camera, size=resolution)
+            self.stream = self.camera.capture_continuous(self.rawCapture, format="bgr", use_video_port=True)
+            self.shutdown_event = shutdown_event
+            self.kill_event = kill_event
+#            self.frame_width = frame_width
+#            self.frame_height = frame_height
+            self.resolution =resolution
+            # initialize the frame and the variable used to indicate
+            # if the thread should be stopped
+            self.frame = None
+            self.stopped = False
+            time.sleep(1)
+
+        def start(self):
+            # start the thread to read frames from the video stream
+            Thread(target=self.update, args=()).start()
+            return self
+
+        def update(self):
+            # keep looping infinitely until the thread is stopped
+            for f in self.stream:
+                # grab the frame from the stream and clear the stream in
+                # preparation for the next frame
+                self.frame = f.array
+                self.rawCapture.truncate(0)
+
+                # if the thread indicator variable is set, stop the thread
+                # and resource camera resources
+                if self.stopped:
+                    print('[PiVideoStream] : Closing Camera...')
+                    self.stream.close()
+                    self.rawCapture.close()
+                    self.camera.close()
+                    time.sleep(3)
+                    return
+
+        def read(self):
+            # return the frame most recently read
+            return self.frame
+
+        def stop(self):
+            # indicate that the thread should be stopped
+            self.stopped = True
+
+        def read(self):
+            # return the frame most recently read
+            return self.frame
+
+        def stop(self):
+            # indicate that the thread should be stopped
+            self.stopped = True
+            
+
+    # created a *threaded* video stream, allow the camera sensor to warmup,
+    # and start the FPS counter
+    if not shutdown_event.isSet() and not kill_event.isSet():
+        print("[Stereo] starting THREADED frames from `picamera` module...")
+
+        vs = PiVideoStream(shutdown_event, kill_event, framerate, resolution = (frame_width, frame_height)).start()
+
+        print("[Stereo] : Initializing camera")
+        time.sleep(2.0)
+
+        ProcessLoop(vs, clientPort, BUFFER_SIZE)
+
+
+def GetUnoData(UNO, shutdown_event, kill_event):
     getdata = False
     dataPresent = False
+    
     while getdata == False:
-        print('[PitchYaw(Thread)] : in Mega.Serial while 1')
+        #print('[GetUnoData] : in UNO Serial while 1')
         if UNO.is_open:
-            print('[PitchYaw(Thread)] : in the Mega.is_open')
-            while not dataPresent:
-                print('[PitchYaw(Thread)] : in Mega.Serial while 2')
+            #print('[GetUnoData] : in the UNO is_open')
+            while not dataPresent and not shutdown_event.isSet() and not kill_event.isSet():
+
+                UNO.reset_input_buffer()
+
+                print('[GetUnoData] : in UNO Serial while 2')
                 try:
-                    print('[PitchYaw(Thread)] : trying to read startMarker')
+                    print('[GetUnoData] : trying to read startMarker')
                     startMarker = UNO.read().decode()
                 except Exception as e:
-                    print('[PitchYaw(Thread)] : didnt get Mega data' + e)
+                    print('[GetUnoData] : didnt get UNO data' + e)
                 if startMarker == "<":
                     unoDataStr = UNO.read(15)  # READ DATA FORMATTED AS ('< 1 >')
                     unoDataTemp = list(unoDataStr.decode())
                     unoDataTemp.insert(0, startMarker)
                     unoData = unoDataTemp[:unoDataTemp.index(">") + 1]
-                    print("[PitchYaw(Thread)] : acquired MegaData  ->  ", unoData)
+                    print("[GetUnoData] : acquired UnoData  ->  ", unoData)
                     tempData = "".join(unoData)
-                    print("[PitchYaw(Thread)] : tempData string  ->  ", tempData)
+                    print("[GetUnoData] : tempData string  ->  ", tempData)
                     dataPresent = True
-                    print('[PitchYaw(Thread)] : data read from Mega')
+                    #print('[GetUnoData] : data read from UNO')
                     getdata = True
                     return tempData
         else:
+            time.sleep(0.1)
             continue
-            time.sleep(0.4)
-        time.sleep(0.2)  # << MAY NEED TO BE CHANGED IF READ DATA IS GARBAGE
+        time.sleep(0.4)  # << MAY NEED TO BE CHANGED IF READ DATA IS GARBAGE
 
 
-def GetMegaData(MEGA):
+def GetMegaData(MEGA, shutdown_event, kill_event):
     getdata = False
     dataPresent = False
 
-    while getdata == False:
-        print('[Launcher(Thread)] : in Mega.Serial while 1')
+    while getdata == False and not shutdown_event.isSet() and not kill_event.isSet():
+        #print('[GetMegaData] : in Mega Serial while 1')
         if MEGA.is_open:
-            print('[Launcher(Thread)] : in the Mega.is_open')
-            while not dataPresent:
-                print('[Launcher(Thread)] : in Mega.Serial while 2')
+            #print('[GetMegaData] : in the Mega is_open')
+            while not dataPresent and not shutdown_event.isSet() and not kill_event.isSet():
+
+                MEGA.reset_input_buffer()
+
+                #print('[GetMegaData] : in Mega Serial while 2')
                 try:
-                    print('[Launcher(Thread)] : trying to read startMarker')
+                    print('[GetMegaData] : trying to read startMarker')
                     startMarker = MEGA.read().decode()
                 except Exception as e:
-                    print('[Launcher(Thread)] : didnt get Mega data' + str(e))
+                    print('[GetMegaData] : didnt get Mega data' + str(e))
                 if startMarker == "<":
                     megaDataStr = MEGA.read(25)  # READ DATA FORMATTED AS ('< 1 2 3 4 5 >')
                     megaDataTemp = list(megaDataStr.decode())
                     megaDataTemp.insert(0, startMarker)
                     megaData = megaDataTemp[:megaDataTemp.index(">") + 1]
-                    print("[Launcher(Thread)] : acquired MegaData  ->  ", megaData)
+                    print("[GetMegaData] : acquired MegaData  ->  ", megaData)
                     tempData = "".join(megaData)
-                    print("[Launcher(Thread)] : tempData string  ->  ", tempData)
+                    print("[GetMegaData] : tempData string  ->  ", tempData)
                     dataPresent = True
-                    print('[Launcher(Thread)] : data read from Mega')
                     getdata = True
                     return tempData
-                else:
-                    time.sleep(0.1)
-                    continue
-                # print(megaDataStr)
-                time.sleep(0.4)  # < MAYBE IMPORTANT
+        else:
+            time.sleep(0.1)
+            continue
+        time.sleep(0.4)
 
 def findEvo():
     # Find Live Ports, return port name if found, NULL if not
@@ -1336,6 +1491,28 @@ def findEvo():
     for p in ports:
         #print p # This causes each port's information to be printed out.
         if "5740" in p[2]:
+            # print ('Evo found on port ' + p[0])
+            return(p[0])
+    return ('NULL')
+
+def findUNO():
+    # Find Live Ports, return port name if found, NULL if not
+    # print ('Scanning all live ports on this PC')
+    ports = list(serial.tools.list_ports.comports())
+    for p in ports:
+        #print p # This causes each port's information to be printed out.
+        if "0043" in p[2]:
+            # print ('Evo found on port ' + p[0])
+            return(p[0])
+    return ('NULL')
+
+def findMEGA():
+    # Find Live Ports, return port name if found, NULL if not
+    # print ('Scanning all live ports on this PC')
+    ports = list(serial.tools.list_ports.comports())
+    for p in ports:
+        #print p # This causes each port's information to be printed out.
+        if "0042" in p[2]:
             # print ('Evo found on port ' + p[0])
             return(p[0])
     return ('NULL')
@@ -1369,7 +1546,7 @@ def Lidar1Dist(evo):
     #
 
 # MAIN FILE START
-def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # , args): ## NOT A THREAD, performs the bulk of calculation
+def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, PitchYawStart, LauncherStart, EvoStart):  # , args): ## NOT A THREAD, performs the bulk of calculation
     # # _______________________________Main Processing_____________________________________
     if not shutdown_event.isSet() and not kill_event.isSet():
         # __ VARIABLES _____#
@@ -1379,13 +1556,17 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
         lead_time = 3
         z_dist_deque = deque([])
         measure_time_deque = deque([])
-        evo_lidar = False
 
         # __ GUI Input __ #
         guiData = GuiInput
         guiData.speed = speed
         guiData.difficulty = difficulty
         guiData.drilltype = drillType
+
+        StartPitchYaw = PitchYawStart
+        StartLauncher = LauncherStart
+        EvoLidar = EvoStart
+
         print("[MainThread] : ")
         print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(
             guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
@@ -1393,26 +1574,29 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
 
         guiStack.push(guiData)
         # ___ OPEN SERIAL PORT/S ___ #
-        while not evo_lidar and not shutdown_event.isSet() and not kill_event.isSet():
-            try:
-                port = findEvo()
-                evo = serial.Serial(port, baudrate=115200, timeout=2)
-                set_text = (0x00, 0x11, 0x01, 0x45)
-                evo.flushInput()
-                evo.write(set_text)
-                evo.flushOutput()
-                print("[MainThread] : Connected to Evo (LIDAR1)")
-                evo_lidar = True
-            except serial.SerialException as e:
-                print("[MainThread] : Cannot find Evo LIDAR1" + str(e))
-                time.sleep(2)
-                continue
-            except:
-                print("[MainThread] : Cannot find Evo LIDAR1")
-                time.sleep(2)
-                continue
+        if EvoLidar:
+            evo_data = False
 
-    # ___ Start Threads ___ #
+            while not evo_data and not shutdown_event.isSet() and not kill_event.isSet():
+                try:
+                    port = findEvo()
+                    evo = serial.Serial(port, baudrate=115200, timeout=2)
+                    set_text = (0x00, 0x11, 0x01, 0x45)
+                    evo.flushInput()
+                    evo.write(set_text)
+                    evo.flushOutput()
+                    print("[MainThread] : Connected to Evo (LIDAR1)")
+                    evo_data = True
+                except serial.SerialException as e:
+                    print("[MainThread] : Cannot find Evo LIDAR1" + str(e))
+                    time.sleep(2)
+                    continue
+                except:
+                    print("[MainThread] : Cannot find Evo LIDAR1")
+                    time.sleep(2)
+                    continue
+
+    # _______________________ Start Threads _______________________--_ #
 
     if not shutdown_event.isSet() and not kill_event.isSet():
         print("Starting Threads")
@@ -1420,24 +1604,31 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
             print("[MainThread] : STERESCOPICS NOT STARTING")
         else:
             try:
-                process = Thread(target=StereoscopicsThread, args=[stereoStack, shutdown_event, kill_event])
-                process.start()
+                StereoCameras = Thread(target=StereoscopicsThread, args=[stereoStack, shutdown_event, kill_event])
+                StereoCameras.start()
             except Exception as e:
                 print('[MainThread] : Stereo thread failed because of exception ' + str(e))
 
-        time.sleep(4)
-        try:
-            pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack, shutdown_event, kill_event)
-            pitchYawthread.start()
-        except Exception as e:
-            print('[MainThread] : Pitch and Yaw thread didnt start because of exception ' + str(e))
+        time.sleep(3)
+        if StartPitchYaw:
+            try:
+                pitchYawthread = PitchYaw(stereoStack, guiStack, temperatureStack, megaDataStack, finalDistStack, futureDistStack, shutdown_event, kill_event)
+                pitchYawthread.start()
+            except Exception as e:
+                print('[MainThread] : pitchYawthread didnt start because of exception ' + str(e))
+        else:
+            print('[MainThread] : pitchYawthread thread is not starting')
+        print(StartLauncher)
+        if StartLauncher:
+            try:
+                startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
+                startLauncherThread.start()
+            except Exception as e:
+                print('[MainThread] : Launcher thread didnt start because of exception ' + str(e))
+                time.sleep(1)
+        else:
+            print('[MainThread] : startLauncherThread thread is not starting')
 
-        try:
-            startLauncherThread = Launcher(megaDataStack, lidar2Stack, guiStack, stereoStack, lidar1Stack, finalDistStack, temperatureStack, futureDistStack, shutdown_event, kill_event)
-            startLauncherThread.start()
-        except Exception as e:
-            print('[MainThread] : Launcher thread didnt start because of exception ' + str(e))
-            time.sleep(1)
 
     if shutdown_event.isSet():
         print("[MainThread] : STOP BUTTON PRESSED")
@@ -1484,20 +1675,21 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                 distanceTotal = stereo_Distance
 
                 # Get(NO_WAIT) for Lidar_1_Dist _____________________________
-                try:
-                    LIDAR_1_Distance = Lidar1Dist(evo)
-                    evo.flushOutput()
-                    time.sleep(0.05)
-                    if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-                        rationaleDistMeasures += 1
-                        distanceTotal += LIDAR_1_Distance
-                        lidar1Stack.push(LIDAR_1_Distance)
-                    else:
-                        lidar1Stack.push(None)  # << None value indicates no GOOD new data
+                if EvoLidar:
+                    try:
+                        LIDAR_1_Distance = Lidar1Dist(evo)
+                        evo.flushOutput()
+                        time.sleep(0.05)
+                        if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                            rationaleDistMeasures += 1
+                            distanceTotal += LIDAR_1_Distance
+                            lidar1Stack.push(LIDAR_1_Distance)
+                        else:
+                            lidar1Stack.push(None)  # << None value indicates no GOOD new data
 
-                except Exception as w:
-                    print("[MainThread] : LIDAR_1 -> no data" + str(w))
-                    pass
+                    except Exception as w:
+                        print("[MainThread] : LIDAR_1 -> no data" + str(w))
+                        pass
 
                 # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
                 try:
@@ -1543,7 +1735,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
                 futureDistStack.push(FUT_FINAL_DIST)
 
             else:
-                print("Player is not in Range")
+                print("[MainThread] : Player is not in Range")
                 # Activate GPIO pin for notification LED
                 # ***Do something about this***
                 time.sleep(0.5)
@@ -1566,6 +1758,3 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event):  # 
         sys.exit()
     else:
         print("[MainThread] : Not sure what went wrong")
-
-# ________ Run The Program ____________ #
-# startMainFile(3,4,"manual")  # for testing purposes only
