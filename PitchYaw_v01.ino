@@ -143,106 +143,118 @@ void parseData() {      // split the data into its parts
     Serial.println(Motor1_Speed);
     Serial.println("ms2");
     Serial.println(Motor2_Speed);
-
-
-    newposition= ((myEnc.read()));// number of countable events seen       
-    int player_angle = newposition/ ((2.96011)*(49.1684)); // players angle from orgin (zero position) 
-    
-//********* YAW SECTION
-//*** DIRECTION OF YAW
-    if (Motor1_Speed >0){
-        digitalWrite(In1,HIGH);// Clockwise rotation of the motor, Pin 7 outputing HIGH and pin 8 outputing LOW
-        digitalWrite(In2,LOW);}
-    if (Motor1_Speed<0){
-        digitalWrite(In1,LOW);// Counter-Clockwise rotation of the motor, Pin 7 outputing HIGH and pin 8 outputing LOW
-        digitalWrite(In2,HIGH);}
  
-//*** SPEED OF YAW
-    Speed = abs(Motor1_Speed);
-    
-    analogWrite(ENA,Speed);    
+void yawMotor(){
+ //********* YAW SECTION
+     newposition= ((myEnc.read()));// number of countable events seen       
+     int player_angle = newposition/ ((2.96011)*(49.1684)); // players angle from orgin (zero position) 
 
-    if (abs(newposition) >= Barrier){
-        Speed = 0;
-        analogWrite(ENA,Speed);}
-        
+ //*** DIRECTION OF YAW
+     if (Motor1_Speed >0){
+         digitalWrite(In1,HIGH);// Clockwise rotation of the motor, Pin 7 outputing HIGH and pin 8 outputing LOW
+         digitalWrite(In2,LOW);
+     }
+     if (Motor1_Speed<0){
+         digitalWrite(In1,LOW);// Counter-Clockwise rotation of the motor, Pin 7 outputing HIGH and pin 8 outputing LOW
+         digitalWrite(In2,HIGH);
+     }
+ //*** SPEED OF YAW
+     Speed = abs(Motor1_Speed);
+     analogWrite(ENA,Speed);    
+  
+     if (abs(newposition) >= Barrier){
+         Speed = 0;
+         analogWrite(ENA,Speed);
+     }
+}
+
+ void Reset()
+ {
 //*** RESET FUNCTION
-      if (Motor1_Speed == 300){
-
+      if (Motor1_Speed == 300)
+      {
 //********ROTATION AMOUNT FROM LEFT OF CENTRE POSITION->NEWPOSITION=0 ( CLOCKWISE ROTATION )
-        if (newposition >0){
-          digitalWrite(In1,LOW);// Pin 7 outputing HIGH and pin 8 outputing LOW
-          digitalWrite(In2,HIGH);
-          Speed = 200;
-          analogWrite(ENA,Speed);//initialize speed
-          
-//***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)  
-          while true {
-          newposition= ((myEnc.read()));
-          Serial.println(newposition);
-          
-//***********REACHED CENTRE POSITION, BREAK
-          if (newposition <= 0) {
-            Speed = 0;
-            analogWrite(ENA,Speed);
-            break;
-         }
-         }
-         }
+        if (newposition >0)
+        {
+           digitalWrite(In1,LOW);// Pin 7 outputing HIGH and pin 8 outputing LOW
+           digitalWrite(In2,HIGH);
+           Speed = 200;
+           analogWrite(ENA,Speed);//initialize speed
+
+ //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)  
+           while true 
+           {
+           newposition= ((myEnc.read()));
+           Serial.println(newposition);
+
+ //***********REACHED CENTRE POSITION, BREAK
+           if (newposition <= 0) {
+             Speed = 0;
+             analogWrite(ENA,Speed);
+             break;
+          }
+          }
+        }
 
 //********ROTATION AMOUNT FROM RIGHT OF CENTRE POSITION->NEWPOSITION=0 ( COUNTER-CLOCKWISE ROTATION )
-        if (newposition <0){
-          // Serial.println("cp2");
-          digitalWrite(In1,HIGH);// Pin 7 outputing HIGH and pin 8 outputing LOW
-          digitalWrite(In2,LOW);
-          Speed = 200;
-          analogWrite(ENA,Speed);//initialize speed
-          
-//***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)   
-          while true {
-          newposition= ((myEnc.read()));
-          Serial.println(newposition);
+        if (newposition <0)
+        {
+           // Serial.println("cp2");
+           digitalWrite(In1,HIGH);// Pin 7 outputing HIGH and pin 8 outputing LOW
+           digitalWrite(In2,LOW);
+           Speed = 200;
+           analogWrite(ENA,Speed);//initialize speed
 
-//***********REACHED CENTRE POSITION, BREAK
-          if (newposition >= 0){
-            Speed = 0;
-            analogWrite(ENA,Speed);
-            break;
-          }
-         }
+ //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)   
+           while true 
+           {
+           newposition= ((myEnc.read()));
+           Serial.println(newposition);
+
+ //***********REACHED CENTRE POSITION, BREAK
+           if (newposition >= 0){
+             Speed = 0;
+             analogWrite(ENA,Speed);
+             break;
+           }
+           }
         }
       }
+ }
+ 
+void pitchMotor()
+{ 
+ //*********PITCH SECTION
+ //***ANGLE DEFINED
+     angle1 = 45 - Motor2_Speed;
+     angle = angle1 - offset;
+     //Cposition=analogRead(ref1);
+     Cposition = analogRead(ref1);
 
-//*********PITCH SECTION
-//***ANGLE DEFINED
-    angle1 = 45 - Motor2_Speed;
-    angle = angle1 - offset;
-    //Cposition=analogRead(ref1);
-    Cposition = analogRead(ref1);
+     desiredpos= ((abs(angle)-1)/45.00)*(933)+48;
 
-    desiredpos= ((abs(angle)-1)/45.00)*(933)+48;
-   
-    Setpoint = desiredpos;
-    myPID.Compute();
-    Serial.println("PID Output: ");
-    Serial.println(Output);
+     Setpoint = desiredpos;
+     myPID.Compute();
+     Serial.println("PID Output: ");
+     Serial.println(Output);
+ }
  
 void accelerometerData()
  {
-  // Read normalized values 
-  Vector normAccel = mpu.readNormalizeAccel();
+   // Read normalized values 
+   Vector normAccel = mpu.readNormalizeAccel();
 
-  // Calculate Pitch & Roll
-  offset = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0)/M_PI;
-  //int roll = (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0)/M_PI;
+   // Calculate Pitch & Roll
+   offset = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0)/M_PI;
+   //int roll = (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0)/M_PI;
 
-  // Output
-  Serial.print(" Pitch = ");
-  Serial.print(pitch);
-  
-  Serial.println();
-  
-  delay(10);
+   // Output
+   Serial.print(" Pitch offset = ");
+   Serial.print(offset);
+
+   Serial.println();
+
+   delay(10);
 }
 //***DIRECTION OF PITCH 
 //     if (Cposition < oldposition)
