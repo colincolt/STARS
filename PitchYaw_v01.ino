@@ -71,7 +71,7 @@ void setup() {
   pinMode(ref1,INPUT); //pin A0 is an input
   
 //***SERIAL COMMUNICATIONS
-  Serial.begin(9600);// Window Prompt
+  Serial.begin(115200);// Window Prompt
   while(!Serial);
  // Wire.begin();
 //setupMPU();
@@ -217,6 +217,7 @@ void parseData() {      // split the data into its parts
     myPID.Compute();
     Serial.println("PID Output: ");
     Serial.println(Output);
+ 
  
 //***DIRECTION OF PITCH 
 //     if (Cposition < oldposition)
