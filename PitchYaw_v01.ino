@@ -249,6 +249,8 @@ void pitchMotor()
      angle = angle1 - offset;
      //Cposition=analogRead(ref1);
      Cposition = analogRead(ref1);
+ 
+ // would probably need to use some trig for accurate angles
 
      desiredpos= ((abs(angle)-1)/45.00)*(933)+48;
 
