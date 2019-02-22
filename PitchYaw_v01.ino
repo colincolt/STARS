@@ -165,11 +165,11 @@ void parseData() {      // split the data into its parts
         if (newposition >0){
           digitalWrite(In1,LOW);// Pin 7 outputing HIGH and pin 8 outputing LOW
           digitalWrite(In2,HIGH);
-          Speed = 255;
+          Speed = 200;
           analogWrite(ENA,Speed);//initialize speed
           
 //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)  
-          while True {
+          while true {
           newposition= ((myEnc.read()));
           Serial.println(newposition);
           
@@ -177,20 +177,21 @@ void parseData() {      // split the data into its parts
           if (newposition <= 0) {
             Speed = 0;
             analogWrite(ENA,Speed);
-            break;}
-            }
-           }
+            break;
+         }
+         }
+         }
 
 //********ROTATION AMOUNT FROM RIGHT OF CENTRE POSITION->NEWPOSITION=0 ( COUNTER-CLOCKWISE ROTATION )
         if (newposition <0){
-          Serial.println("cp2");
+          // Serial.println("cp2");
           digitalWrite(In1,HIGH);// Pin 7 outputing HIGH and pin 8 outputing LOW
           digitalWrite(In2,LOW);
           Speed = 200;
           analogWrite(ENA,Speed);//initialize speed
           
 //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)   
-          do{
+          while true {
           newposition= ((myEnc.read()));
           Serial.println(newposition);
 
@@ -198,9 +199,11 @@ void parseData() {      // split the data into its parts
           if (newposition >= 0){
             Speed = 0;
             analogWrite(ENA,Speed);
-            break;}
-        }while (1>0);}
+            break;
+          }
+         }
         }
+      }
 
     
 //*********PITCH SECTION
