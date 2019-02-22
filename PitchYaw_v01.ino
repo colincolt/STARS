@@ -148,11 +148,11 @@ void parseData() {      // split the data into its parts
     if (Motor1_Speed<0){
         digitalWrite(In1,LOW);// Counter-Clockwise rotation of the motor, Pin 7 outputing HIGH and pin 8 outputing LOW
         digitalWrite(In2,HIGH);}
+ 
 //*** SPEED OF YAW
     Speed = abs(Motor1_Speed);
     
-    analogWrite(ENA,Speed);
-    
+    analogWrite(ENA,Speed);    
 
     if (abs(newposition) >= Barrier){
         Speed = 0;
@@ -169,7 +169,7 @@ void parseData() {      // split the data into its parts
           analogWrite(ENA,Speed);//initialize speed
           
 //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)  
-          do{
+          while True {
           newposition= ((myEnc.read()));
           Serial.println(newposition);
           
@@ -178,7 +178,8 @@ void parseData() {      // split the data into its parts
             Speed = 0;
             analogWrite(ENA,Speed);
             break;}
-            }while (1>0);}
+            }
+           }
 
 //********ROTATION AMOUNT FROM RIGHT OF CENTRE POSITION->NEWPOSITION=0 ( COUNTER-CLOCKWISE ROTATION )
         if (newposition <0){
@@ -200,7 +201,6 @@ void parseData() {      // split the data into its parts
             break;}
         }while (1>0);}
         }
-
 
     
 //*********PITCH SECTION
