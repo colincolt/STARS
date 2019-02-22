@@ -219,63 +219,63 @@ void parseData() {      // split the data into its parts
     Serial.println(Output);
  
 //***DIRECTION OF PITCH 
-    if (Cposition < oldposition)
-    {
-      angle = (-1)*angle;}
-//***PITCH WILL NOT MOVE IF IN SAME POSITION AS DESIRED POSITION
-  if (last1 == Motor2_Speed)
-  {
-    digitalWrite(In3,HIGH);// Retract, Pin 7 outputing HIGH and pin 8 outputing LOW
-    digitalWrite(In4,LOW);
-    int Speed = 0;
-    analogWrite(ENA2,Speed);}
-//***
-  else if (angle >0)
-      {
-        digitalWrite(In3,HIGH);// Retract, Pin 7 outputing HIGH and pin 8 outputing LOW
-        digitalWrite(In4,LOW);
-        int Speed = 255;
-        analogWrite(ENA2,Speed);//Output);
-        Cposition=analogRead(ref1);
-        oldposition = Cposition;
-        Serial.println("runnning2 ");
-        //Input = analogRead(ref1);
-       // Setpoint = desiredpos; 
-       // myPID.SetMode(AUTOMATIC);
+//     if (Cposition < oldposition)
+//     {
+//       angle = (-1)*angle;}
+// //***PITCH WILL NOT MOVE IF IN SAME POSITION AS DESIRED POSITION
+//   if (last1 == Motor2_Speed)
+//   {
+//     digitalWrite(In3,HIGH);// Retract, Pin 7 outputing HIGH and pin 8 outputing LOW
+//     digitalWrite(In4,LOW);
+//     int Speed = 0;
+//     analogWrite(ENA2,Speed);}
+// //***
+//   else if (angle >0)
+//       {
+//         digitalWrite(In3,HIGH);// Retract, Pin 7 outputing HIGH and pin 8 outputing LOW
+//         digitalWrite(In4,LOW);
+//         int Speed = 255;
+//         analogWrite(ENA2,Speed);//Output);
+//         Cposition=analogRead(ref1);
+//         oldposition = Cposition;
+//         Serial.println("runnning2 ");
+//         //Input = analogRead(ref1);
+//        // Setpoint = desiredpos; 
+//        // myPID.SetMode(AUTOMATIC);
    
-//***PITCH IS ON OR JUST PAST DESIRED POSITION(STOP)        
-        if (Cposition<=desiredpos)
-        {
-        Cposition=analogRead(ref1);  
-        Speed = 0;
-        analogWrite(ENA2,Speed);
-        last1 = Motor2_Speed;
-        oldposition = Cposition;
-        }
-      }
-  else if (angle <0)
-      {
-        digitalWrite(In3,LOW);// Extend, Pin 7 outputing HIGH and pin 8 outputing LOW
-        digitalWrite(In4,HIGH);
-        int Speed = 255;
-        analogWrite(ENA2,Speed);//Output);
-        Cposition=analogRead(ref1);
-        oldposition = Cposition;
-        Serial.println("runnning1");
-        //Input = analogRead(ref1);
-       // Setpoint = desiredpos; 
-       // myPID.SetMode(AUTOMATIC);
+// //***PITCH IS ON OR JUST PAST DESIRED POSITION(STOP)        
+//         if (Cposition<=desiredpos)
+//         {
+//         Cposition=analogRead(ref1);  
+//         Speed = 0;
+//         analogWrite(ENA2,Speed);
+//         last1 = Motor2_Speed;
+//         oldposition = Cposition;
+//         }
+//       }
+//   else if (angle <0)
+//       {
+//         digitalWrite(In3,LOW);// Extend, Pin 7 outputing HIGH and pin 8 outputing LOW
+//         digitalWrite(In4,HIGH);
+//         int Speed = 255;
+//         analogWrite(ENA2,Speed);//Output);
+//         Cposition=analogRead(ref1);
+//         oldposition = Cposition;
+//         Serial.println("runnning1");
+//         //Input = analogRead(ref1);
+//        // Setpoint = desiredpos; 
+//        // myPID.SetMode(AUTOMATIC);
    
-//***PITCH IS ON OR JUST PAST DESIRED POSITION(STOP)         
-        if (Cposition>=desiredpos)
-         {
-          Cposition=analogRead(ref1);  
-          Speed = 0;
-          analogWrite(ENA2,Speed);
-          last1 = Motor2_Speed;
-          oldposition = Cposition;
-         }     
-  }
+// //***PITCH IS ON OR JUST PAST DESIRED POSITION(STOP)         
+//         if (Cposition>=desiredpos)
+//          {
+//           Cposition=analogRead(ref1);  
+//           Speed = 0;
+//           analogWrite(ENA2,Speed);
+//           last1 = Motor2_Speed;
+//           oldposition = Cposition;
+//          }     
+//   }
          
     }
 //void setupMPU(){
