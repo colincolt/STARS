@@ -96,15 +96,35 @@ void loop() {
 //*** SERIAL COMMUNICATION (turning serial input into integer)
  
   recvWithStartEndMarkers();
-  if (newData == true) {
+ 
+  if (newData == true) 
+  {
     strcpy(tempChars, receivedChars);
     parseData();
-    newData = false;}
-  if (millis() - prevDisplayMillis >= displayInterval) {
+    newData = false;
+  }
+ 
+ if (Motor1_Speed <= 255)
+ {
+  yawMotor();
+ }
+  
+ else 
+ {
+  Reset();
+ }
+ 
+ 
+ if (millis() - prevDisplayMillis >= displayInterval) 
+ {
        prevDisplayMillis += displayInterval;
        //recordAccelRegisters();
-       accelerometerData()
-   }
+       accelerometerData();
+  }
+ pitchMotor();
+ 
+ 
+   
   }
 
 void recvWithStartEndMarkers() {
@@ -143,7 +163,7 @@ void parseData() {      // split the data into its parts
     Serial.println(Motor1_Speed);
     Serial.println("ms2");
     Serial.println(Motor2_Speed);
- 
+}
 void yawMotor(){
  //********* YAW SECTION
      newposition= ((myEnc.read()));// number of countable events seen       
@@ -171,8 +191,7 @@ void yawMotor(){
  void Reset()
  {
 //*** RESET FUNCTION
-      if (Motor1_Speed == 300)
-      {
+      
 //********ROTATION AMOUNT FROM LEFT OF CENTRE POSITION->NEWPOSITION=0 ( CLOCKWISE ROTATION )
         if (newposition >0)
         {
@@ -220,7 +239,7 @@ void yawMotor(){
            }
         }
       }
- }
+ 
  
 void pitchMotor()
 { 
