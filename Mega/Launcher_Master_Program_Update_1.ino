@@ -156,6 +156,7 @@ int Wireless_Stage = 0;
 int Speed_Poll = 7;
 int VR_poll = 1;
 
+unsigned long time_of_flight;
 unsigned long wirelessDelay;
 
 float targetBallSpeed;
@@ -250,7 +251,7 @@ void setup() {
 // ------------------------- SERIAL INPUT ------------------------- // 
 
     Serial.begin(115200);
-    Serial.println("This demo expects 6 pieces of data - MotorSpeed1 (RPM), MotorSpeed2 (RPM), targetChoice, difficulty, ballFeed, wirelessDelay (half the TOF)");
+    Serial.println("This demo expects 6 pieces of data - MotorSpeed1 (RPM), MotorSpeed2 (RPM), targetChoice, difficulty, ballFeed, time_of_flight (half the TOF)");
     Serial.println("Enter data in this style <2000,3000,1,5,1,5000>  ");
     Serial.println();
 
@@ -895,6 +896,9 @@ void Serial_Input() {
         newData = false;
 //        data_receive = 1;
 //        start_time = millis();
+        wirelessDelay = time_of_flight - (time_of_flight/10)*difficulty;
+        Serial.print("wirelessDelay = ");
+        Serial.println(wirelessDelay);
         Process_Stage = 1;
     }
 }
@@ -955,7 +959,7 @@ void parseData() {      // split the data into its parts
     ballFeed = atoi(strtokIndx);     // convert this part to an integer
 
     strtokIndx = strtok(NULL, ","); // this continues where the previous call left off
-    wirelessDelay = atoi(strtokIndx);     // convert this part to an integer   
+    time_of_flight = atoi(strtokIndx);     // convert this part to an integer   
 }
 
 
@@ -1010,8 +1014,8 @@ void showParsedData() {
     Serial.println(difficulty);
     Serial.print("ballFeed = ");
     Serial.println(ballFeed);
-    Serial.print("wirelessDelay = ");
-    Serial.println(wirelessDelay);
+    Serial.print("time_of_flight = ");
+    Serial.println(time_of_flight);
 }
 
 
