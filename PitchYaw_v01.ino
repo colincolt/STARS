@@ -201,7 +201,7 @@ void yawMotor(){
            analogWrite(ENA,Speed);//initialize speed
 
  //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)  
-           while true 
+           while (true) 
            {
            newposition= ((myEnc.read()));
            Serial.println(newposition);
@@ -225,7 +225,7 @@ void yawMotor(){
            analogWrite(ENA,Speed);//initialize speed
 
  //***********READ COUNTABLE EVENTS FROM THE ENCODER CHANNELS (FOREVER, EXIT:BREAK OUT OF LOOP)   
-           while true 
+           while (true) 
            {
            newposition= ((myEnc.read()));
            Serial.println(newposition);
@@ -334,7 +334,7 @@ void accelerometerData()
 //          }     
 //   }
          
-    }
+//    }
 //void setupMPU(){
 //  Wire.beginTransmission(0b1101000); //This is the I2C address of the MPU (b1101000/b1101001 for AC0 low/high datasheet sec. 9.2)
 //  Wire.write(0x6B); //Accessing the register 6B - Power Management (Sec. 4.28)
@@ -375,4 +375,6 @@ void accelerometerData()
 //    }
 //  
 //  }
+
+
 
