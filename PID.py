@@ -8,7 +8,7 @@ class PID:
         self.Ki = I
         self.Kd = D
 
-        self.sample_time = 0.10
+        self.sample_time = 0.4
         self.current_time = time.time()
         self.last_time = self.current_time
 
@@ -30,7 +30,7 @@ class PID:
         self.output = 0.0
 
     def update(self, pixel_displacement):
-        pixel_displacement_scaledown = pixel_displacement / 10     # Assuming max pixelDisp ~2000 (~ 0 - 200)
+        pixel_displacement_scaledown = (pixel_displacement / 10) -90     # Assuming max pixelDisp ~2000 (~ 0 - 200)
 
         error = self.SetPoint + pixel_displacement_scaledown        #ERROR ALWAYS POSITIVE?
 
@@ -76,4 +76,6 @@ class PID:
         # PID that should be updated at a regular interval.
         # Based on a pre-determined sampe time, the PID decides if it should compute or return immediately.
         self.sample_time = sample_time
+
+
 

@@ -18,6 +18,7 @@ class gui_app():
         self.Evo = True
 
     def START(self, ballSpeed, difficulty, drillType):
+        shutdown_event.clear()
         def StartProgram(ballSpeed, difficulty, drillType):
             main_launcher.startMainFile(ballSpeed, difficulty, drillType, shutdown_event, kill_event, self.PitchYaw, self.Launcher, self.Evo)
 
@@ -43,7 +44,7 @@ class gui_app():
     def PitchYaw_Only_Cmd(self):
         self.Launcher = False
 
-    def Laucnher_Only_Cmd(self):
+    def Launcher_Only_Cmd(self):
         self.PitchYaw = False
 
     def No_Evo(self):
@@ -85,7 +86,7 @@ class gui_app():
 
 
         PitchYaw_1 = CheckBox(window1, command=self.PitchYaw_Only_Cmd, args=[], text="PitchYaw Only")
-        Launcher_1 = CheckBox(window1, command=self.Laucnher_Only_Cmd, args=[], text="Launcher Only")
+        Launcher_1 = CheckBox(window1, command=self.Launcher_Only_Cmd, args=[], text="Launcher Only")
         Evo_1 = CheckBox(window1, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_1 = PushButton(window1, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_1 = PushButton(window1, command=self.stop_command, args=[], text="Stop")
@@ -128,7 +129,7 @@ class gui_app():
         Slide2.text_color = "white"
 
         PitchYaw_2 = CheckBox(window2, command=self.PitchYaw_Only_Cmd, args=[], text="PitchYaw Only")
-        Launcher_2 = CheckBox(window2, command=self.Laucnher_Only_Cmd, args=[], text="Launcher Only")
+        Launcher_2 = CheckBox(window2, command=self.Launcher_Only_Cmd, args=[], text="Launcher Only")
         Evo_2 = CheckBox(window2, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_2 = PushButton(window2, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_2 = PushButton(window2, command=self.stop_command, args=[], text="stop")
@@ -165,7 +166,7 @@ class gui_app():
         Slide1.text_color = "white"
 
         PitchYaw_3 = CheckBox(window3, command=self.PitchYaw_Only_Cmd, args=[], text="PitchYaw Only")
-        Launcher_3 = CheckBox(window3, command=self.Laucnher_Only_Cmd, args=[], text="Launcher Only")
+        Launcher_3 = CheckBox(window3, command=self.Launcher_Only_Cmd, args=[], text="Launcher Only")
         Evo_3 = CheckBox(window3, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_3 = PushButton(window3, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_3 = PushButton(window3, command=self.stop_command, args=[], text="stop")

@@ -242,7 +242,8 @@ class PitchYaw(Thread):
                 last_start_time = start_time
                 first_measure = True
             else:
-                temp_time = last_start_time - start_time
+                temp_time = start_time - last_start_time
+                last_start_time = start_time
                 measure_time_deque.appendleft(temp_time)
                 print(measure_time_deque)
                 if len(measure_time_deque) > avg_measure:
@@ -253,10 +254,10 @@ class PitchYaw(Thread):
                 displacement = dist_deque[len(dist_deque)-1] - dist_deque[len(dist_deque)-2]
                 changein_time = measure_time_deque[len(measure_time_deque)-1] - measure_time_deque[len(measure_time_deque)-2]
                 Check_speed = displacement / changein_time
-                print("Check Speed" + str(Check_speed))
-                if Check_speed >= 4: #might need to pop both points 
-                    measure_time_deque.pop(len(measure_time_deque)-1)
-                    dist_deque.pop(len(dist_deque)-1)
+                #print("Check Speed" + str(Check_speed))
+#                if Check_speed >= 4: #might need to pop both points 
+#                    measure_time_deque.pop(len(measure_time_deque)-1)
+#                    dist_deque.pop(len(dist_deque)-1)
             # ________________________________________________________________________ ##
 
             if drillType == "Dynamic":
@@ -348,8 +349,10 @@ class PitchYaw(Thread):
                         pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                        scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                        scaled_pid = int((pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                         # scaled_pid = -+80 at 7.75 m
+                        print(scaled_pid)
+
 
                         if scaled_pid == 0:
                             scaled_pid = 0
@@ -357,11 +360,13 @@ class PitchYaw(Thread):
                             scaled_pid = -255
                         elif (scaled_pid > 255):
                             scaled_pid = 255
-                        elif (0 > scaled_pid > -80):
+                        elif (-40 < scaled_pid < 40):
+                            scaled_pid = 0
+                        elif (-40 > scaled_pid > -80):
                             scaled_pid = -80
-                        elif (0 < scaled_pid < 80):
+                        elif (40 < scaled_pid < 80):
                             scaled_pid = 80
-
+                        
                         motorSpeed = str(scaled_pid)
 
                         # ** ___ SEND DATA ___ ** #
@@ -413,8 +418,9 @@ class PitchYaw(Thread):
                         pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                        scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                        scaled_pid = int((pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                         # scaled_pid = -+80 at 7.75 m
+                        print(scaled_pid)
 
                         if scaled_pid == 0:
                             scaled_pid = 0
@@ -422,10 +428,13 @@ class PitchYaw(Thread):
                             scaled_pid = -255
                         elif (scaled_pid > 255):
                             scaled_pid = 255
-                        elif (0 > scaled_pid > -80):
+                        elif (-40 < scaled_pid < 40):
+                            scaled_pid = 0
+                        elif (-40 > scaled_pid > -80):
                             scaled_pid = -80
-                        elif (0 < scaled_pid < 80):
+                        elif (40 < scaled_pid < 80):
                             scaled_pid = 80
+                        
 
                         motorSpeed = str(scaled_pid)
 
@@ -496,8 +505,9 @@ class PitchYaw(Thread):
                     pid.update(latPixelDisp)
                     pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                     # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                    scaled_pid = (pid_output / 400) * 255  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                    scaled_pid = int((pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                     # scaled_pid = -+80 at 7.75 m
+                    print(scaled_pid)
 
                     if scaled_pid == 0:
                         scaled_pid = 0
@@ -505,10 +515,13 @@ class PitchYaw(Thread):
                         scaled_pid = -255
                     elif (scaled_pid > 255):
                         scaled_pid = 255
-                    elif (0 > scaled_pid > -80):
+                    elif (-40 < scaled_pid < 40):
+                        scaled_pid = 0
+                    elif (-40 > scaled_pid > -80):
                         scaled_pid = -80
-                    elif (0 < scaled_pid < 80):
+                    elif (40 < scaled_pid < 80):
                         scaled_pid = 80
+                        
 
                     motorSpeed = str(scaled_pid)
 
