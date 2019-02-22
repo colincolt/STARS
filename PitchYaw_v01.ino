@@ -31,16 +31,16 @@
  int ENA2 = 11;// Pin 5(Uno) is connected to the motor controller ENA pin
  int ref1 = A0;//Pin A0(Uno) is connected to the linear actuator position signal(blue)
  int last1 = 0;
- int Cposition = 0;
+ //int Cposition = 0;
  int Motor2_Speed = 0;
  int angle1= 0;
  int desiredpos = 0;
  
 //***PID VARIABLES
  double Setpoint;
- double Input;
+ double Cposition;
  double Output;
- PID myPID(&Input, &Output, &Setpoint,2,0,0,DIRECT);
+ PID myPID(&Cposition, &Output, &Setpoint,2,0,0,DIRECT);
 
 //***ACCELEROMETER VARIABLES
  long accelX, accelY, accelZ;
@@ -86,7 +86,6 @@ void setup() {
 
 void loop() {
 //*** SERIAL COMMUNICATION (turning serial input into integer)
-  Input = analogRead(ref1);
  
   recvWithStartEndMarkers();
   if (newData == true) {
@@ -205,19 +204,18 @@ void parseData() {      // split the data into its parts
         }
       }
 
-    
 //*********PITCH SECTION
 //***ANGLE DEFINED
     angle1 = 45 - Motor2_Speed;
     angle = angle1 - offset;
+    //Cposition=analogRead(ref1);
+    Cposition = analogRead(ref1);
 
-    Cposition=analogRead(ref1);
- 
     desiredpos= ((abs(angle)-1)/45.00)*(933)+48;
    
     Setpoint = desiredpos;
     myPID.Compute();
-    Serial.println("Output:");
+    Serial.println("PID Output: ");
     Serial.println(Output);
  
 //***DIRECTION OF PITCH 
