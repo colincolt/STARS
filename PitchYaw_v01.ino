@@ -252,7 +252,7 @@ void pitchMotor()
  
  // would probably need to use some trig for accurate angles
 
-     desiredpos= (abs(angle))/45.00)*(933)+48;
+     desiredpos= ((abs(angle))/45.00)*(933)+48;
 
      Setpoint = desiredpos;
      myPID.Compute();
