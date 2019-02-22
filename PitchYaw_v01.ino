@@ -1,8 +1,11 @@
 // LIBRARIES
  #include <Encoder.h>
  #include <PID_v1.h>
-// #include <Wire.h>
-//***YAW MOTOR CONTROL PINS 
+ #include <Wire.h>
+ #include <MPU6050.h>//***YAW MOTOR CONTROL PINS 
+
+MPU6050 mpu;
+
  int In1= 8;// Pin 7(Uno) is connected to the motor controller In1 pin
  int In2 = 7;// Pin 8(Uno) is connected to the motor controller In2 pin
  int ENA = 9;// Pin 5(Uno) is connected to the motor controller ENA pin
@@ -82,6 +85,11 @@ void setup() {
 
   myPID.SetMode(AUTOMATIC);
 //  Time = millis();
+ while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G))
+  {
+    Serial.println("Could not find a valid MPU6050 sensor, check wiring!");
+    delay(500);
+  }
 }
 
 void loop() {
@@ -95,6 +103,7 @@ void loop() {
   if (millis() - prevDisplayMillis >= displayInterval) {
        prevDisplayMillis += displayInterval;
        //recordAccelRegisters();
+       accelerometerData()
    }
   }
 
@@ -218,7 +227,23 @@ void parseData() {      // split the data into its parts
     Serial.println("PID Output: ");
     Serial.println(Output);
  
- 
+void accelerometerData()
+ {
+  // Read normalized values 
+  Vector normAccel = mpu.readNormalizeAccel();
+
+  // Calculate Pitch & Roll
+  offset = -(atan2(normAccel.XAxis, sqrt(normAccel.YAxis*normAccel.YAxis + normAccel.ZAxis*normAccel.ZAxis))*180.0)/M_PI;
+  //int roll = (atan2(normAccel.YAxis, normAccel.ZAxis)*180.0)/M_PI;
+
+  // Output
+  Serial.print(" Pitch = ");
+  Serial.print(pitch);
+  
+  Serial.println();
+  
+  delay(10);
+}
 //***DIRECTION OF PITCH 
 //     if (Cposition < oldposition)
 //     {
