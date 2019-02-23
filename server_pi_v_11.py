@@ -141,6 +141,9 @@ class PitchYaw(Thread):
         self.shutdown_event = shutdown_event
         self.kill_event = kill_event
 
+    def newfunc(self):
+        print("Hello from NEW FUNCTION")
+
     def run(self):
         # ** __ RECORD A LIST OF OLD MEASUREMENTS FOR TRACKING: __ ** #
         dist_deque = deque([])
@@ -184,22 +187,25 @@ class PitchYaw(Thread):
         print("[PitchYawThread] : Starting")
 
         while not startData and not self.shutdown_event.isSet() and not self.kill_event.isSet():
-            # _ARDUINO_UNO__SERIAL_OPEN
             try:
                 # Initialize Arduino UNO
                 uno_port = findUNO()
                 UNO = serial.Serial(uno_port, 115200)  # change ACM number as found from "ls /dev/tty*"
                 UNO.baudrate = 115200
 
-                # ____________ ACQUIRE ACCELEROMETER DATA  ____________ #
-                # tempAngle = GetUnoData(UNO, self.shutdown_event, self.kill_event)
-                # launcherAngle = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
-                # Get Temperature Data
-                # temperature = self.getTemperatureStack.peek()
+                # _________   ___ Get ACCELEROMETER Data  ____________ #
 
+                # tempAngle = GetUnoData(UNO, self.shutdown_event, self.kill_event)
+                # launcherOffset = round(int(tempAngle.strip("<").strip().strip(">")[0]))  # lidarDistance = int(cm)
+                # Get Temperature Data
+
+                # ___________ Get TEMPERATURE Data _______________
+
+                # temperature = self.getTemperatureStack.peek()
                 tempCorrection = 1  # temperature / 25  # <<<tempCorrection factor
 
-                # Get GUI Data
+                # ___________ Get GUI Data _______________
+
                 guiData = self.getguiStack.peek()
                 # drillSpeed = guiData.speed
                 # difficulty = guiData.difficulty
@@ -212,30 +218,33 @@ class PitchYaw(Thread):
                 print("[PitchYaw(Thread)] : Received start data")
                 startData = True
                 continue
-
             finally:
                 if self.shutdown_event.isSet():
                     print("PitchYaw(Thread)] : STOP BUTTON PRESSED")
                     break
                 else:
                     print("[PitchYaw(Thread)] : starting Loop")
-
         print("[PitchYawThread] : Starting")
 
-        while not self.shutdown_event.isSet() and not self.kill_event.isSet():
-            # <<< BEGINNING OF PITCHYAW LOOP _________________________________ ** #
-            #            MEGAdata = self.getmegaDataStack.peek()
-            #            voiceCommand = MEGAdata.voicecommand
 
-            #            while not self.shutdown_event.isSet() and not self.kill_event.isSet(): #voiceCommand != "beginVC" and
-            #                try:
-            #                    MEGAdata = self.getmegaDataStack.peek()
-            #                    voiceCommand = MEGAdata.voicecommand  # voice commands = int(from 1 to 5)
-            #                except AttributeError as novoice:
-            #                    print("[PitchYaw] : No VoiceCommand" + str(novoice))
-            #                    time.sleep(0.5)
-            #                except Exception as e:
-            #                    print("[PitchYaw] : Exception" + str(e))
+        while not self.shutdown_event.isSet() and not self.kill_event.isSet(): # <<< BEGINNING OF PITCHYAW LOOP __________ #
+
+            #  _____________ Get MEGA Data _____________
+
+           # MEGAdata = self.getmegaDataStack.peek()
+           # voiceCommand = MEGAdata.voicecommand
+           #
+           # while not self.shutdown_event.isSet() and not self.kill_event.isSet(): #voiceCommand != "beginVC" and
+           #     try:
+           #         MEGAdata = self.getmegaDataStack.peek()
+           #         voiceCommand = MEGAdata.voicecommand  # voice commands = int(from 1 to 5)
+           #     except AttributeError as novoice:
+           #         print("[PitchYaw] : No VoiceCommand" + str(novoice))
+           #         time.sleep(0.5)
+           #     except Exception as e:
+           #         print("[PitchYaw] : Exception" + str(e))
+
+            # ___________________ LOOP TIME DEQUE ___________________ #
 
             start_time = time.time()
 
@@ -251,6 +260,14 @@ class PitchYaw(Thread):
                     measure_time_deque.pop()
                 first_measure = False
 
+                # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
+                latPixelDisp = (2464 - LeftXcoord - RightXcoord)
+                # PICK MOTOR DIRECTION:
+                if (2464 - LeftXcoord < RightXcoord):
+                    latPixelDisp = -latPixelDisp
+
+            # ___________________ PLAYER SPEED DEQUE ___________________ #
+
             if len(measure_time_deque) >= 2 and len(dist_deque) >= 2:
                 displacement = dist_deque[len(dist_deque) - 1] - dist_deque[len(dist_deque) - 2]
                 changein_time = measure_time_deque[len(measure_time_deque) - 1] - measure_time_deque[
@@ -262,21 +279,36 @@ class PitchYaw(Thread):
             #                    dist_deque.pop(len(dist_deque)-1)
             # ________________________________________________________________________ ##
 
-            if drillType == "Dynamic":
+            # ___________________ GET stereoStack DATA ___________________ #
+            cameradata = False
+            while not cameradata and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                 try:
-                    cameradata = False
-                    while not cameradata and not self.shutdown_event.isSet() and not self.kill_event.isSet():
-                        try:
-                            stereodata = self.getstereoStack.peek()
-                            LeftXcoord = stereodata.masterval
-                            RightXcoord = stereodata.slaveval
-                            stereoDist = int(stereodata.distance)
-                            cameradata = True
-                        except:  # EmptyStackError # <- return EmptyStackError if Stack is empty in peek #####!!!!!!!
-                            print("[PithYaw(Thread)] : no data in stereoStack")
-                            time.sleep(2)
-                            continue
+                    stereodata = self.getstereoStack.peek()
+                    LeftXcoord = stereodata.masterval
+                    RightXcoord = stereodata.slaveval
+                    stereoDist = int(stereodata.distance)
+                    cameradata = True
+                except ValueError as verr:
+                    print("[PithYaw(Thread)] : StereoDistance couldnt be converted to float" + str(verr))
+                    if stereodata is None:
+                        print("[PithYaw(Thread)] : ... because Stack is Empty")
+                        continue
+                    else:
+                        self.getStereoStack.pop()
+                        print("[PithYaw(Thread)] : issue with stereo data, removing it and trying again")
+                    continue
+                except Exception as e:
+                    print("[PithYaw(Thread)] : Error getting getStereoStack" + str(e))
+                    time.sleep(2)
+                    continue
 
+
+            # ________________________ DYNAMIC DRILL ________________________ #
+            if drillType == "Dynamic":
+                # In Dynamic,  increase players "latPixelDisp" to stay ahead of the player
+                latPixelDisp += (dynamic_pixel_buff / usedDistance)
+
+                try:
                     # Try for FUT_FINAL_DIST _______________
                     try:
                         FUT_FINAL_DIST = self.getfutureDistStack.peek()
@@ -310,7 +342,9 @@ class PitchYaw(Thread):
                     # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
 
                     if futureDist:
+
                         # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
+
                         usedDistance = FUT_FINAL_DIST
 
                         if not first_measure:  #
@@ -322,25 +356,14 @@ class PitchYaw(Thread):
                         if usedDistance > 25.0: usedDistance = 25.0
 
                         # ** _________________ PITCH ANGLE: __________________ ** #
+
                         # Query table for angle at usedDistance
                         row = round((usedDistance - 0.99) / 2) - 2
                         if row < 0:
                             row = 0
                         elif row > 11:
                             row = 11
-                        pitchAngle = pitchAngleTable[
-                                         row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE (via row)
-
-                        # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
-                        latPixelDisp = (2464 - LeftXcoord - RightXcoord)
-                        latPixelDisp += (dynamic_pixel_buff / usedDistance)
-                        # PICK MOTOR DIRECTION:
-                        if (2464 - LeftXcoord < RightXcoord):
-                            latPixelDisp = -latPixelDisp
-
-                        # *** If we need to scale down the max speed as the player gets closer (same pixel disp at different distances correspond to different angles)
-                        # if usedDistance < 8: usedDistance = 8 (makes sure minimum motorSpeed=80 (8/25 = 0.31 -> 0.31*255=80))
-                        # error_scaling = usedDistance / 25  # <<< ERROR SCALING
+                        pitchAngle = pitchAngleTable[row, 1] + launcherAngle
 
                         # lateralDisplacement = latPixelDisp * PixToDistApprox
                         # latDispDeque.appendleft(lateralDisplacement)
@@ -349,11 +372,8 @@ class PitchYaw(Thread):
 
                         pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
-                        # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                        scaled_pid = int((
-                                                     pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
-                        # scaled_pid = -+80 at 7.75 m
-                        print(scaled_pid)
+                        scaled_pid = int((pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                        print("[PitchYaw] Scaled PID Output:  " + str(scaled_pid))
 
                         if scaled_pid == 0:
                             scaled_pid = 0
@@ -380,21 +400,20 @@ class PitchYaw(Thread):
                             usedDistance = FINAL_DIST
                         else:
                             usedDistance = stereoDist
+
                         # << CASE 2: Have to predict FUT_FINAL_DIST ourselves if we dont get it
 
                         # ** ________"PREDICT" FUT_FINAL_DIST (z-distance) of the player from available data: ________ ** #
 
                         if len(dist_deque) == avg_measure:
-                            tempDist = dist_deque[0] - dist_deque[
-                                avg_measure - 1]  # Distance covered in avg_measure measurements
+                            tempDist = dist_deque[0] - dist_deque[avg_measure - 1]  # Distance covered in avg_measure # of measurements
                             temp_time = sum([elem for elem in measure_time_deque])  # Time for avg_measure measurements
                             speed = tempDist / temp_time  # meters/second
-                            # the idea is to stay ahead of the player by at least a second or two
                             FUT_FINAL_DIST = usedDistance + speed * 3
                             usedDistance = FUT_FINAL_DIST
 
                         # ** ________________________PITCH ANGLE: ______________________ ** #
-                        # Query table for angle at usedDistance
+
                         row = round((usedDistance - 0.99) / 2) - 2  # << ENSURE THIS IS A MULTIPLE OF 2 BETWEEN 6-34
                         if row < 0:
                             row = 0
@@ -402,27 +421,18 @@ class PitchYaw(Thread):
                             row = 11
                         pitchAngle = pitchAngleTable[row, 1]  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
-                        # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
-                        latPixelDisp = (2464 - LeftXcoord - RightXcoord)
-                        latPixelDisp += (dynamic_pixel_buff / usedDistance)
-                        # PICK MOTOR DIRECTION:
-                        if (2464 - LeftXcoord < RightXcoord):
-                            latPixelDisp = -latPixelDisp
-                        # *** If we need to scale down the max speed as the player gets closer (same pixel disp at different distances correspond to different angles)
-                        # if usedDistance < 8: usedDistance = 8 (makes sure minimum motorSpeed=80 (8/25 = 0.31 -> 0.31*255=80))
-                        # error_scaling = usedDistance / 25  # <<< ERROR SCALING
-
                         # lateralDisplacement = latPixelDisp * PixToDistApprox
                         # latDispDeque.appendleft(lateralDisplacement)
                         # if len(latDispDeque) > 10:
                         #     latDispDeque.pop()
+
+                        # _________________ Handle PID OUTPUT _________________ #
+
                         pid.update(latPixelDisp)
                         pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                         # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                        scaled_pid = int((
-                                                     pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
-                        # scaled_pid = -+80 at 7.75 m
-                        print(scaled_pid)
+                        scaled_pid = int((pid_output / 400) * 255)  #  (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                        print("[PitchYaw] Scaled PID Output:  " + str(scaled_pid))
 
                         if scaled_pid == 0:
                             scaled_pid = 0
@@ -448,22 +458,11 @@ class PitchYaw(Thread):
                     print('[PitchYaw(Thread)] : failed because of exception ' + e)
                     continue
 
+            # ________________________ STATIC AND DYNAMIC DRILL ________________________ #
+
             if drillType == "Static" or drillType == "Manual":
                 try:
-                    cameradata = False
-                    while not cameradata and not self.shutdown_event.isSet() and not self.kill_event.isSet():
-                        try:
-                            stereodata = self.getstereoStack.peek()
-                            cameradata = True
-                        except:
-                            print("[PithYaw(Thread)] : no data in stereoStack")
-                            self.shutdown_event.set()
-
-                    LeftXcoord = stereodata.masterval
-                    RightXcoord = stereodata.slaveval
-                    stereoDist = int(stereodata.distance)
-
-                    # Try for FINAL_DIST _______________
+                    # Get for FINAL_DIST _______________
                     try:
                         FINAL_DIST = self.getfinalDistStack.peek()
                         finalDist = True
@@ -476,41 +475,30 @@ class PitchYaw(Thread):
                     else:
                         usedDistance = stereoDist
 
+                    # _________________ APPEND TO THE DISTANCE DEQUE _________________
                     dist_deque.appendleft(usedDistance)
                     if len(dist_deque) > avg_measure:
                         dist_deque.pop()
 
                     # ** _________________ PITCH ANGLE: __________________ ** #
-                    # Query table for angle at usedDistance
                     row = round((usedDistance - 0.99) / 2) - 2
                     if row < 0:
                         row = 0
                     elif row > 11:
                         row = 11
-                    pitchAngle = pitchAngleTable[
-                                     row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
-
-                    # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
-                    latPixelDisp = (2464 - LeftXcoord - RightXcoord)
-                    latPixelDisp += (dynamic_pixel_buff / usedDistance)
-                    # PICK MOTOR DIRECTION:
-                    if (2464 - LeftXcoord < RightXcoord):
-                        latPixelDisp = -latPixelDisp
-                    # *** If we need to scale down the max speed as the player gets closer (same pixel disp at different distances correspond to different angles)
-                    # if usedDistance < 8: usedDistance = 8 (makes sure minimum motorSpeed=80 (8/25 = 0.31 -> 0.31*255=80))
-                    # error_scaling = usedDistance / 25  # <<< ERROR SCALING
+                    pitchAngle = pitchAngleTable[row, 1] + launcherAngle  # << ANGLE IS ALREADY SET BASED ON FUTURE DISTANCE
 
                     # lateralDisplacement = latPixelDisp * PixToDistApprox
                     # latDispDeque.appendleft(lateralDisplacement)
                     # if len(latDispDeque) > 10:
                     #     latDispDeque.pop()
+
                     pid.update(latPixelDisp)
                     pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
                     # ***NEED PROPER TESTING TO TUNE PID AND OUTPUT SCALING
-                    scaled_pid = int(
-                        (pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                    scaled_pid = int((pid_output / 400) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                     # scaled_pid = -+80 at 7.75 m
-                    print(scaled_pid)
+                    print("[PitchYaw] Scaled PID Output:  " + str(scaled_pid))
 
                     if scaled_pid == 0:
                         scaled_pid = 0
@@ -522,7 +510,6 @@ class PitchYaw(Thread):
                         scaled_pid = -low_limit
                     elif (0 < scaled_pid < low_limit):
                         scaled_pid = low_limit
-
 
                     motorSpeed = str(scaled_pid)
 
@@ -554,7 +541,7 @@ class PitchYaw(Thread):
             print("[PitchYaw] : Not sure what went wrong")
 
 
-# _____________LAUNCHER THREAD_____________________#
+# _____________________________________LAUNCHER THREAD__________________________________#
 # Connects and communicates with the Arduino Mega: Launcher Motors, Ball Feeder, Wifi, Accelerometer? (Rangefinder?)
 # Launcher(Thread): ---> Arduino MEGA provide Angle values to both motors, request temperature's from the Uno, and distance measurements
 # RECEIVE from MEGA:
@@ -649,14 +636,16 @@ class Launcher(Thread):
                     temperature = 25
                     voiceCommand = -1
                     continue
+                else:
+                    MegaData.temperature = temperature
+                    MegaData.voiceCommand = voiceCommand
+                    self.sendTemperatureStack.push(temperature)
+                    self.sendMegaDataStack.push(MegaData)
 
-                MegaData.temperature = temperature
-                MegaData.voiceCommand = voiceCommand
-                self.sendTemperatureStack.push(temperature)
-                self.sendMegaDataStack.push(MegaData)
+
 
                 # ****SET TEMPERATURE CORRECTION FACTOR*****
-                tempCorrect = temperature / 25
+                tempCorrect = 1 # temperature / 25
                 # *****************************************
 
                 # Get drillType data from GUI__ #
@@ -666,6 +655,7 @@ class Launcher(Thread):
                 drillType = guiData.drilltype
                 # print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
 
+                # _____________________WAIT FOR VOICE COMMAND TO BEGIN DRILL _____________________WAIT
                 while voiceCommand != beginVC and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                     try:
                         tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
@@ -689,7 +679,9 @@ class Launcher(Thread):
         while drillCount <= 5 and not self.shutdown_event.isSet() and not self.kill_event.isSet():
             try:
                 if drillType == 'Dynamic':
-                    # Limit the speed at which the launching sequence runs:
+
+                    # ___________________ HOLD THE LAUNCHER SEQUENCE FOR 3-4 SECONDS: ___________________
+
                     if LaunchTime is None:
                         pass
                     else:
@@ -698,12 +690,13 @@ class Launcher(Thread):
 
                     startTime = time.time()
 
-                    # ___________________ RECEIVE STEREO DISTANCE (Wait)______________________________________________#
+                    # ___________________ RECEIVE STEREO DISTANCE (Wait)_________________________________#
+                    # !!! NO TIMEOUT YET
+
                     try:
                         stereoData = self.getStereoStack.peek()
                         stereo_Distance = float(stereoData.distance)
                         # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
-                        # oldstereo_Distance = stereo_Distance # <-- Check for new data, needs edits
                     except ValueError as verr:
                         print("[LauncherThread] : StereoDistance couldnt be converted to float" + str(verr))
                         if stereoData is None:
@@ -713,8 +706,8 @@ class Launcher(Thread):
                             self.getStereoStack.pop()
                             print("[LauncherThread] : issue with stereo data, removing it and trying again")
                         continue
-                    except:
-                        print("[Launcher(Thread)] : Error getting 'getStereoStack'")
+                    except Exception as e:
+                        print("[Launcher(Thread)] : Error getting getStereoStack" + str(e))
                         self.shutdown_event.set()
                         continue
                     else:
@@ -722,6 +715,8 @@ class Launcher(Thread):
                         rationaleDistMeasures = 1
 
                     # _______ RECEIVE MEGA DATA STRING (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
+                    # !!! NO TIMEOUT YET
+
                     try:
                         tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                         lidar_2_Distance = int(tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
@@ -749,9 +744,8 @@ class Launcher(Thread):
                                 print("[Launcher(Thread)] : GetMegaData failed" + r)
                                 continue  # < Try again
 
-                    # ___________________END OF RECEIVE MEGA DATA STRING ______________________________________________#
-
                     # ___________________ SEND MEGA DATA TO megaDataStack ______________________________________________#
+
                     MegaData.voiceCommand = voiceCommand
                     if targetTiming != 0.0:
                         MegaData.targetTiming = targetTiming
@@ -766,8 +760,9 @@ class Launcher(Thread):
                     # else:
                     #     MegaData.targetBallSpeed = None
 
+                    # ___________________       Handle Voice input:     ______________________________________________ #
+
                     if voiceCommand > 0:
-                        # ___________________       Handle Voice input:     ______________________________________________ #
                         if voiceCommand == stopVC:
                             self.kill_event.set()
                             sys.exit()
@@ -820,7 +815,6 @@ class Launcher(Thread):
                     MotorSpeed = str(motorSpeed)
                     # ***Randomize targetChoice
                     targetChoice = int(random.choice([1, 2, 3, 4]))
-                    # **** NEED TO ADD A FIFTH VALUE FOR FEED/NO-FEED OF BALL****
                     ballFeed = 0
                     data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
                         difficulty) + ',' + str(ballFeed) + ',' + str(estimated_tof) + '>'
@@ -920,7 +914,9 @@ class Launcher(Thread):
                             print("[Launcher(Thread)] : process took too long to keep up with drill")
                             self.shutdown_event.set()
 
-                if drillType == 'Static': # __________#_______________#________________#__________________#_______________#
+                # ____________________________ STATIC DRILL _____________________________ #
+
+                if drillType == 'Static':
                     # Limit the speed at which the launching sequence runs:
                     if LaunchTime is None:
                         pass
@@ -932,6 +928,7 @@ class Launcher(Thread):
                     startTime = time.time()
 
                     # ___________________ RECEIVE STEREO DISTANCE (Wait)_____________________#
+
                     try:
                         stereoData = self.getStereoStack.peek()
                         stereo_Distance = float(stereoData.distance)
@@ -954,6 +951,7 @@ class Launcher(Thread):
                         rationaleDistMeasures = 1
 
                     #  RECEIVE MEGA DATA STRING (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed #
+                    
                     try:
                         tempData = GetMegaData(MEGA, self.shutdown_event, self.kill_event)
                         lidar_2_Distance = int(tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
