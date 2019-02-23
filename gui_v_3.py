@@ -1,5 +1,5 @@
 from guizero import App, Text, PushButton, Window, Slider, Picture, CheckBox
-import server_pi_v_11 as main_launcher
+import server_pi_v_12 as main_launcher
 from threading import Thread, Event
 import sys
 
@@ -152,7 +152,7 @@ class gui_app():
 
     def manualDrill(self):
         second_message.value = "Entering Manual Mode"
-        gui_app.drillType = "Manual"
+        self.drillType = "Manual"
 
         window3 = Window(app, bg="darkgreen")
 
