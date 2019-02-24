@@ -103,6 +103,7 @@ lidar1Stack = Stack()
 temperatureStack = Stack()
 futureDistStack = Stack()
 
+# GLOBAL LED NOTIFICATION LIGHTS
 red_1 = LED(13)
 red_2 = LED(21)
 red_3 = LED(6)
@@ -110,9 +111,6 @@ green = LED(5)
 yellow = LED(26)
 white = LED(19)
 blue = LED(16)
-
-# GLOBAL LED NOTIFICATION LIGHTS
-
 
 # GLOBAL FLAGS/EVENTS:
 
@@ -401,8 +399,7 @@ class PitchYaw(Thread):
                     self.pid.update(self.latPixelDisp)
                     print("[PitchYaw:Future] latPixelDisplacement:  " + str(self.latPixelDisp))
                     pid_output = self.pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
-                    scaled_pid = int(
-                        (pid_output / 300) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
+                    scaled_pid = int((pid_output / 300) * 255)  # (scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)
                     print("[PitchYaw:Future] Scaled PID Output:  " + str(scaled_pid))
 
                     if scaled_pid <= -200:
@@ -488,7 +485,7 @@ class PitchYaw(Thread):
                     #print("[PithYaw(Thread)] SENT: <motorSpeed, pitchAngle> =  " + data)
                     self.UNO.write(data.encode())
                     print("[PitchYaw] SENT: <motorSpeed, pitchAngle> =  " + data)
-                    time.sleep(0.1)
+                    # time.sleep(0.1)
 
             #                if self.startData:
             #                    self.UNO.set_output_flow_control(False)
@@ -501,8 +498,6 @@ class PitchYaw(Thread):
             print("[PitchYaw] : STOP BUTTON PRESSED")
             time.sleep(2)
             self.shutdown_event.clear()
-            # PitchYaw(self.getstereoStack, self.getguiStack, self.getTemperatureStack, self.getmegaDataStack, self.getfinalDistStack,
-            #      self.getfutureDistStack, self.shutdown_event, self.kill_event)
 
         elif self.kill_event.isSet():
             print("[PitchYaw] : EXITING...")
@@ -582,7 +577,7 @@ class PitchYaw(Thread):
                 data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
                 self.UNO.write(data.encode())
                 print("[PitchYaw] SENT: <motorSpeed, pitchAngle> =  " + data)
-                time.sleep(0.1)
+                # time.sleep(0.1)
                 # ** ____________________________________________________________________ ** #
 
             except Exception as e:
@@ -595,8 +590,6 @@ class PitchYaw(Thread):
             print("[PitchYaw] : STOP BUTTON PRESSED")
             time.sleep(2)
             self.shutdown_event.clear()
-            # PitchYaw(self.getstereoStack, self.getguiStack, self.getTemperatureStack, self.getmegaDataStack, self.getfinalDistStack,
-            #      self.getfutureDistStack, self.shutdown_event, self.kill_event)
 
         elif self.kill_event.isSet():
             print("[PitchYaw] : EXITING...")
@@ -817,8 +810,7 @@ class Launcher(Thread):
                 while not success and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                     try:
                         tempData = GetMegaData(self.MEGA, self.shutdown_event, self.kill_event)
-                        lidar_2_Distance = int(
-                            tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
+                        lidar_2_Distance = int(tempData.strip("<").strip().split(",")[0])  # lidarDistance = int(cm)
                         # temperature = int(tempData.strip().split(",")[1])                            # temperature = int()
                         voiceCommand = int(tempData.strip().split(",")[2])  # voice commands = int(from 1 to 5)
                         targetTiming = float(tempData.strip().split(",")[3])  # targetTiming = float(0.0)
@@ -836,14 +828,11 @@ class Launcher(Thread):
                 self.MegaData.targetTiming = targetTiming
                 print("[LauncherThread] : targetTiming = " + str(targetTiming))
                 targetTiming = 0.0  # < reset
-            # else:
-            #     self.MegaData.targetTiming = None
+            
             if targetBallSpeed != 0.0:
                 self.MegaData.targetBallSpeed = targetBallSpeed
                 print("[LauncherThread] : targetBallSpeed = " + str(targetBallSpeed))
                 targetBallSpeed = 0.0  # < reset
-            # else:
-            #     self.MegaData.targetBallSpeed = None
 
             # ___________________       Handle Voice input:     ______________________________________________ #
 
@@ -888,7 +877,6 @@ class Launcher(Thread):
             print("[LauncherThread] : FINAL_DIST:  " + str(FINAL_DIST))
 
             # CALCULATE THE ESTIMATED TOF:
-            # difficulty_time = diff_time[difficulty - 1]
             estimated_tof = ((0.120617 * FINAL_DIST)) * 1000  # + difficulty_time
 
             # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
@@ -939,7 +927,7 @@ class Launcher(Thread):
                 ballFeed = 1
                 data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
                     self.difficulty) + ',' + str(ballFeed) + str(estimated_tof) + '>'
-                # write data to MEGA
+
                 if (time.time() - startTime) <= 1:
                     try:
                         self.MEGA.reset_output_buffer()
@@ -969,7 +957,6 @@ class Launcher(Thread):
 
                 # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
                 RPM = -1.13635244 * FUT_FINAL_DIST ^ 2 + 97.7378699 * FUT_FINAL_DIST + 646.034298  # <-- Polynomial fit
-                # MOTOR_FREQ = RPM * 0.016666666666667
                 motorSpeed = round(
                     (RPM / 5000) * 255)  # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
 
