@@ -8,7 +8,7 @@ class PID:
         self.Ki = I
         self.Kd = D
 
-        self.sample_time = 0.4
+        self.sample_time = 0.1
         self.current_time = time.time()
         self.last_time = self.current_time
 
@@ -30,7 +30,7 @@ class PID:
         self.output = 0.0
 
     def update(self, pixel_displacement):
-        pixel_displacement_scaledown = (pixel_displacement / 10) -90     # Assuming max pixelDisp ~2000 (~ 0 - 200)
+        pixel_displacement_scaledown = (pixel_displacement / 10) #-90     # Assuming max pixelDisp ~2000 (~ 0 - 200)
 
         error = self.SetPoint + pixel_displacement_scaledown        #ERROR ALWAYS POSITIVE?
 
