@@ -2,7 +2,7 @@ import time
 
 class PID:
     # PID Controller
-    def __init__(self, P=1.0, I=0.1, D=0.05):
+    def __init__(self, P=1.0, I=0.0, D=0.0):
 
         self.Kp = P
         self.Ki = I
@@ -32,7 +32,7 @@ class PID:
     def update(self, pixel_displacement):
         pixel_displacement_scaledown = (pixel_displacement / 10) #-90     # Assuming max pixelDisp ~2000 (~ 0 - 200)
 
-        error = self.SetPoint + pixel_displacement_scaledown        #ERROR ALWAYS POSITIVE?
+        error = self.SetPoint + pixel_displacement_scaledown
 
         self.current_time = time.time()
         delta_time = self.current_time - self.last_time
