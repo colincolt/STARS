@@ -120,7 +120,6 @@ blue = LED(16)
 startMarker = '<'
 
 
-
 # _______PITCH AND YAW THREAD________ #
 
 class PitchYaw(Thread):
@@ -141,6 +140,7 @@ SEND to UNO:
 SEND to STACKS:
 - launcherAngle -->  launcherAngleStack --> Launcher(Thread)
 '''
+
     def __init__(self, getstereoStack, getguiStack, getTemperatureStack, getmegaDataStack, getfinalDistStack,
                  getfutureDistStack, shutdown_event, kill_event):
         Thread.__init__(self)
@@ -635,7 +635,6 @@ SEND to STACKS:
         else:
             print("[PitchYaw] : Not sure what went wrong")
 
-
     def run(self):
         print("[PitchYaw] : Starting")
 
@@ -715,25 +714,23 @@ class Launcher(Thread):
         self.distanceTotal = 0
 
         # LAUNCHER OPTIONS:
-        self.DYNAMIC_WAIT_TIME = 3 # seconds
-        self.STATIC_WAIT_TIME = 5 # seconds
-        self.stereo_timeout = 2 # seconds
-        self.mega_timeout = 0.5 # seconds
+        self.DYNAMIC_WAIT_TIME = 3  # seconds
+        self.STATIC_WAIT_TIME = 5  # seconds
+        self.stereo_timeout = 2  # seconds
+        self.mega_timeout = 0.5  # seconds
         # MEGA_DATA Stack values:
-        self.voiceCommand = 1   # < set to 1 for testing the launcher (-1 otherwise)
+        self.voiceCommand = 1  # < set to 1 for testing the launcher (-1 otherwise)
         self.targetTiming = 0.0
         self.targetBallSpeed = 0
         # ____________________
-
 
     def launcher_startup(self):
         startData = False
         arduino_con = False
 
-
         try:  # MEGA_DATA Thread startup:
             mega_port = findMEGA()
-            self.MEGA = serial.Serial(mega_port, 115200, timeout = 1)
+            self.MEGA = serial.Serial(mega_port, 115200, timeout=1)
             self.MEGA.baudrate = 115200
             mega_data_thread = Thread(target=MegaData,
                                       args=[self.MEGA, self.getMegaDataStack, self.shutdown_event, self.kill_event,
@@ -741,7 +738,7 @@ class Launcher(Thread):
             mega_data_thread.start()
 
         except Exception as nodata:
-            print("[LauncherThread] : ** Mega data thread failed to start:  " + str(nodata) +"**")
+            print("[LauncherThread] : ** Mega data thread failed to start:  " + str(nodata) + "**")
             # *****
             self.shutdown_event.set()
             # *****
@@ -751,7 +748,7 @@ class Launcher(Thread):
                 # _____ open MEGA serial port
                 while not arduino_con and not self.shutdown_event.isSet() and not self.kill_event.isSet():
                     try:
-                        
+
                         arduino_con = True
                     except serial.SerialException as err:
                         print("[LauncherThread] : Arduino MEGA not available" + str(err))
@@ -766,7 +763,8 @@ class Launcher(Thread):
                                 self.MEGA_DATA = self.getMegaDataStack.peek()
                                 self.voiceCommand = self.MEGA_DATA.voiceCommand
                                 self.temperature = self.MEGA_DATA.temperature
-                                print("[LauncherThread] : VC = " + str(self.voiceCommand) + "  TEMP = " + str(self.temperature))
+                                print("[LauncherThread] : VC = " + str(self.voiceCommand) + "  TEMP = " + str(
+                                    self.temperature))
                                 time.sleep(0.5)
                             except:
                                 print("[LauncherThread] : Waiting for Voice Command")
@@ -785,7 +783,7 @@ class Launcher(Thread):
                 self.difficulty = guiData.difficulty
                 self.drillType = guiData.drilltype
                 # print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
-                
+
 
             except serial.SerialException as err:
                 print("[LauncherThread] : MEGA not detected" + str(err))
@@ -816,7 +814,8 @@ class Launcher(Thread):
 
             if self.LaunchTime is not None:
                 while (time.time() - self.LaunchTime) < self.DYNAMIC_WAIT_TIME:
-                    print("[LauncherThread] : Holding Loop for:  " + str(self.DYNAMIC_WAIT_TIME) + "  seconds  Waiting for results from target WIFI")
+                    print("[LauncherThread] : Holding Loop for:  " + str(
+                        self.DYNAMIC_WAIT_TIME) + "  seconds  Waiting for results from target WIFI")
                     time.sleep(.1)
 
             # ___________________ RECEIVE STEREO DISTANCE (TIMEOUT)_________________________________#
@@ -826,7 +825,7 @@ class Launcher(Thread):
                 try:
                     self.stereoData = self.getStereoStack.peek()
                     self.stereo_Distance = float(self.stereoData.distance)
-                    # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))                                    
+                    # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
                 except ValueError as verr:
                     print("[LauncherThread] : StereoDistance couldnt be converted to float" + str(verr))
                     if self.stereoData is None:
@@ -844,25 +843,25 @@ class Launcher(Thread):
                     self.distanceTotal = self.stereo_Distance
                     self.rationaleDistMeasures = 1
                     break_loop = True
-                if((time.time() - start_time) >= self.stereo_timeout):
+                if ((time.time() - start_time) >= self.stereo_timeout):
                     print("[LauncherThread] : Stereo Stack Peek operation timed out")
                     break_loop = True
                     self.shutdown_event.set()
-                    
 
             # _______ RECEIVE MEGA DATA (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
 
             try:
                 self.MEGA_DATA = self.getMegaDataStack.peek()
 
-                self.lidar_2_Distance = self.MEGA_DATA.lidar_2_Distance     # lidarDistance = int(cm)
-                self.temperature = self.MEGA_DATA.temperature             # temperature = int()
-                self.voiceCommand = self.MEGA_DATA.voiceCommand             # voice commands = int(from 1 to 5)
-                self.targetTiming = self.MEGA_DATA.targetTiming             # targetTiming = float(0.0)
-                self.targetBallSpeed = self.MEGA_DATA.targetBallSpeed       # targetBallSpeed
+                self.lidar_2_Distance = self.MEGA_DATA.lidar_2_Distance  # lidarDistance = int(cm)
+                self.temperature = self.MEGA_DATA.temperature  # temperature = int()
+                self.voiceCommand = self.MEGA_DATA.voiceCommand  # voice commands = int(from 1 to 5)
+                self.targetTiming = self.MEGA_DATA.targetTiming  # targetTiming = float(0.0)
+                self.targetBallSpeed = self.MEGA_DATA.targetBallSpeed  # targetBallSpeed
 
                 self.lidar_2_Distance = self.lidar_2_Distance / 100  # << convert LIDAR 2 from cm to meters
-                print("<"+ str(self.lidar_2_Distance)+"," +str(self.temperature) + ","+ str(self.voiceCommand)+"," +str(self.targetTiming)+"," + str(self.targetBallSpeed)+">" )
+                print("<" + str(self.lidar_2_Distance) + "," + str(self.temperature) + "," + str(
+                    self.voiceCommand) + "," + str(self.targetTiming) + "," + str(self.targetBallSpeed) + ">")
             except serial.SerialException as err:
                 print("[LauncherThread] : MEGA not detected" + err)
                 print("[LauncherThread] : Closing LauncherThread")
@@ -872,7 +871,7 @@ class Launcher(Thread):
                 time.sleep(1)
                 continue
                 # _____________________________________________________________________________________________
-            else: # < ** HANDLE THE MEGA_DATA:
+            else:  # < ** HANDLE THE MEGA_DATA:
                 if self.targetTiming != 0:
                     #  print("[LauncherThread] : targetTiming = " + str(targetTiming))
                     print("[LauncherThread] : targetTiming = " + str(self.targetTiming))
@@ -911,12 +910,11 @@ class Launcher(Thread):
 
                 # ___________________       EVO LIDAR:    _______________________________ #
 
-
                 try:
                     lidar_1_Distance = self.getLidar1Stack.peek()
                     lidar_1_Distance = lidar_1_Distance / 1000  # <<<<<< CONVERT to meters from mm
                     if lidar_1_Distance is not None and abs(
-                        self.stereo_Distance - lidar_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                            self.stereo_Distance - lidar_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                         self.rationaleDistMeasures += 1
                         self.distanceTotal += lidar_1_Distance
                         print("[LauncherThread] : lidar_1_Distance:  " + str(lidar_1_Distance))
@@ -930,13 +928,13 @@ class Launcher(Thread):
                     self.sendfinalDistStack.push(FINAL_DIST)
                 except ZeroDivisionError:
                     print("[LauncherThread] : ** No VALID distance data **")
-                    continue                # < Go back to the beginning and try again
+                    continue  # < Go back to the beginning and try again
                 else:
                     print("[LauncherThread] : FINAL_DIST:  " + str(FINAL_DIST))
 
                     # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
-                    RPM = -1.13635244 * FINAL_DIST**2.0 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
+                    RPM = -1.13635244 * FINAL_DIST ** 2.0 + 97.7378699 * FINAL_DIST + 646.034298  # <-- Polynomial fit
                     # MOTOR_FREQ = RPM * 0.016666666666667
                     print(RPM)
                     motorSpeed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
@@ -950,24 +948,20 @@ class Launcher(Thread):
                     # CALCULATE THE ESTIMATED TOF:
                     estimated_tof = ((0.120617 * FINAL_DIST)) * 1000  # + difficulty_time
 
-                    self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(self.difficulty) + ',' + str(ballFeed) + ',' + str(estimated_tof) + '>'
+                    self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
+                        self.difficulty) + ',' + str(ballFeed) + ',' + str(estimated_tof) + '>'
                     # _____________________________________________________________________
-
 
                     # ____________________ Write data to MEGA ____________________
                     self.send_flag.set()
                     time.sleep(0.2)
                     self.send_mega_stack.push(self.send_data)
-                    
 
             # _____ GET FUT_FINAL_DIST (No Wait)
-            print("before")
             if self.OLD_FUT_FINAL_DIST is not None:
-                print("After/in")
                 self.OLD_FUT_FINAL_DIST = FUT_FINAL_DIST
 
             try:
-                print("try")
                 FUT_FINAL_DIST = self.getfutureDist.peek()  # <<<<< GET PREDICTED LOCATION
                 print(FUT_FINAL_DIST)
             except:
@@ -980,9 +974,7 @@ class Launcher(Thread):
                     ballFeed = 1
                     self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
                         self.difficulty) + ',' + str(ballFeed) + str(estimated_tof) + '>'
-                    
-                    
-                    
+
                     if (time.time() - startTime) <= 5:
                         self.send_flag.set()
                         time.sleep(0.2)
@@ -997,7 +989,7 @@ class Launcher(Thread):
                     # time.sleep(0.1)  # <-- ALLOW TIME FOR PREVIOUS DATA TO BE READ AND CLEARED FROM THE BUFFER
                     print(FUT_FINAL_DIST)
                     # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
-                    RPM = -1.13635244 * FUT_FINAL_DIST**2 + 97.7378699 * FUT_FINAL_DIST + 646.034298  # <-- Polynomial fit
+                    RPM = -1.13635244 * FUT_FINAL_DIST ** 2 + 97.7378699 * FUT_FINAL_DIST + 646.034298  # <-- Polynomial fit
                     motorSpeed = round((RPM / 5000) * 255)  # * tempCorrect? # Value between 0-255 (On 24 V: 0-5000 RPM)
 
                     # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-1'
@@ -1012,6 +1004,7 @@ class Launcher(Thread):
                         self.send_flag.set()
                         if self.send_flag.isSet():
                             print("flag is set")
+
                         time.sleep(0.2)
                         self.send_mega_stack.push(self.send_data)
                         self.drillCount += 1  # << ON SUCCESSFUL LAUNCH
@@ -1021,7 +1014,7 @@ class Launcher(Thread):
                         print("[LauncherThread] : process took too long to keep up with drill")
                         self.shutdown_event.set()
             if self.drillCount == 5:
-                print("[LauncherThread] : Drill COMPLETE!")    
+                print("[LauncherThread] : Drill COMPLETE!")
                 self.shutdown_event.set()
 
         if self.shutdown_event.isSet():
@@ -1032,7 +1025,7 @@ class Launcher(Thread):
         elif self.kill_event.isSet():
             print("[LauncherThread] : EXITING...")
             sys.exit()
-        
+
         else:
             print("[LauncherThread] : Not sure what went wrong")
 
@@ -1060,12 +1053,12 @@ class Launcher(Thread):
             # ___________________ RECEIVE STEREO DISTANCE (TIMEOUT)_________________________________#
             start_time = time.time()
             break_loop = False
-            
+
             while not break_loop:
                 try:
                     self.stereoData = self.getStereoStack.peek()
                     self.stereo_Distance = float(self.stereoData.distance)
-                    # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))               
+                    # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
                 except ValueError as verr:
                     print("[LauncherThread] : StereoDistance couldnt be converted to float" + str(verr))
                     if self.stereoData is None:
@@ -1082,8 +1075,8 @@ class Launcher(Thread):
                     self.distanceTotal = self.stereo_Distance
                     self.rationaleDistMeasures = 1
                     break_loop = True
-                       
-                if(time.time() - start_time >= self.stereo_timeout):
+
+                if (time.time() - start_time >= self.stereo_timeout):
                     print("[LauncherThread] : Stereo Stack Peek operation timed out")
                     self.shutdown_event.set()
                     break_loop = True
@@ -1243,8 +1236,8 @@ class Launcher(Thread):
                     self.stereoData = self.getStereoStack.peek()
                     self.stereo_Distance = float(self.stereoData.distance)
                     # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
-                    
-                
+
+
                 except ValueError as verr:
                     print("[LauncherThread] : StereoDistance couldnt be converted to float" + str(verr))
                     if self.stereoData is None:
@@ -1262,7 +1255,7 @@ class Launcher(Thread):
                     self.distanceTotal = self.stereo_Distance
                     self.rationaleDistMeasures = 1
                     break_loop = True
-                if((time.time() - start_time) >= self.stereo_timeout):
+                if ((time.time() - start_time) >= self.stereo_timeout):
                     print("[LauncherThread] : Stereo Stack Peek operation timed out")
                     self.shutdown_event.set()
                     break_loop = True
@@ -1654,7 +1647,7 @@ def GetUnoData(UNO, shutdown_event, kill_event):
 
 def MegaData(MEGA, sendMegaDataStack, shutdown_event, kill_event, send_flag, send_data):
     # Variables:
-    
+
     mega_data = MegaDataClass
 
     while not shutdown_event.isSet() and not kill_event.isSet():
@@ -1672,25 +1665,25 @@ def MegaData(MEGA, sendMegaDataStack, shutdown_event, kill_event, send_flag, sen
                     megaDataTemp.insert(0, startMarker)
                     megaData = megaDataTemp[:megaDataTemp.index(">") + 1]
                     tempData = "".join(megaData)
-                    dataPresent = True
                     getdata = True
                     # IF SEND FLAG IS SET, DATA IS SENT AFTER:
                     print("before flag")
                     if send_flag.isSet():
                         print("in if flag")
-                        
+
                         try:
                             data = send_data.pop()
-                            print(data)
-                            #MEGA.reset_output_buffer()
+                            print("[MegaDataThread] : " + data)
+                            # MEGA.reset_output_buffer()
                             MEGA.write(data.encode())
                             print("[MegaDataThread] : SENT MEGA DATA:  " + send_data)
-                        except Exception as e:
-                            print("[MegaDataThread] : ** MEGA SEND FAILED **")
-                            while(time.time() - startTime >= 0.5) and not shutdown_event.isSet() and not kill_event.isSet():
+                        except serial.SerialException as e:
+                            print("[MegaDataThread] : ** MEGA SEND FAILED **   " + str(e))
+                            while (
+                                    time.time() - startTime >= 0.5) and not shutdown_event.isSet() and not kill_event.isSet():
                                 try:
-                                    MEGA.reset_output_buffer()
-                                    MEGA.write(send_data.encode())
+                                    #MEGA.reset_output_buffer()
+                                    MEGA.write(data.encode())
                                     print("[MegaDataThread] : Launch motors starting...")
                                 except Exception as e:
                                     print("[MegaDataThread] : ** Mega not responding **" + str(e))
@@ -1872,8 +1865,9 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, send
 
         if StartLauncher:
             try:
-                startLauncherThread = Launcher(megaDataStack, send_mega_stack, guiStack, stereoStack, lidar1Stack, finalDistStack,
-                 futureDistStack, shutdown_event, kill_event,send_flag)
+                startLauncherThread = Launcher(megaDataStack, send_mega_stack, guiStack, stereoStack, lidar1Stack,
+                                               finalDistStack,
+                                               futureDistStack, shutdown_event, kill_event, send_flag)
                 startLauncherThread.start()
                 red_3.on()
             except Exception as e:
@@ -1979,7 +1973,8 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, send
                 elif len(z_dist_deque) < avg_measures:
                     z_dist_deque.appendleft(PRE_FINAL_DIST)
                     # FUT_FINAL_DIST = None
-                elif len(z_dist_deque) == avg_measures:  # Wait until we have 10 measurement before calculating players speed (if 5 FPS this means 2 sec)
+                elif len(
+                        z_dist_deque) == avg_measures:  # Wait until we have 10 measurement before calculating players speed (if 5 FPS this means 2 sec)
                     temp_dist = z_dist_deque[0] - z_dist_deque[avg_measures - 1]
                     temp_time = sum([elem for elem in measure_time_deque])  # Time for avg_measure measurements
 
