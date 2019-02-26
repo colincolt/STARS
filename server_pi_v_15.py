@@ -1685,8 +1685,8 @@ def MegaData(MEGA, sendMegaDataStack, shutdown_event, kill_event, send_flag, sen
                                     #MEGA.reset_output_buffer()
                                     MEGA.write(data.encode())
                                     print("[MegaDataThread] : Launch motors starting...")
-                                except Exception as e:
-                                    print("[MegaDataThread] : ** Mega not responding **" + str(e))
+                                except serial.SerialException as e:
+                                    print("[MegaDataThread] : ** MEGA SEND FAILED **   " + str(e))
                                     if time.time() - startTime >= 0.5:
                                         pass
                                 else:
