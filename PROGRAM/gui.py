@@ -1,5 +1,5 @@
 from guizero import App, Text, PushButton, Window, Slider, Picture, CheckBox
-import server_pi as main_launcher
+import main_file as main
 from threading import Thread, Event
 import sys
 
@@ -21,7 +21,7 @@ class gui_app():
     def START(self, ballSpeed, difficulty, drillType):
         shutdown_event.clear()
         def StartProgram(ballSpeed, difficulty, drillType):
-            main_launcher.startMainFile(ballSpeed, difficulty, drillType, shutdown_event, kill_event, self.PitchYaw, self.Launcher, self.Evo)
+            main.startMainFile(ballSpeed, difficulty, drillType, shutdown_event, kill_event, self.PitchYaw, self.Launcher, self.Evo)
 
         self.ballSpeed = ballSpeed
         self.difficulty = difficulty
