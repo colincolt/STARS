@@ -1,5 +1,5 @@
 from guizero import App, Text, PushButton, Window, Slider, Picture, CheckBox
-import server_pi_01 as main_launcher
+import server_pi as main_launcher
 from threading import Thread, Event
 import sys
 
