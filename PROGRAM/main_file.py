@@ -14,7 +14,7 @@ STACKS:
 <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
 <     https://www.pythoncentral.io/stack-tutorial-python-implementation/  '''
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 # Packages
 import stereo
@@ -194,6 +194,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
     EvoLidar = EvoStart
     kill_event = kill_event
     shutdown_event = shutdown_event
+    stereo_Distance = 0.0
     loop_count = 1
 
     if working_on_the_Pi:
@@ -210,7 +211,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
     if EvoLidar:
         evo_data = False
 
-        while not evo_data and not shutdown_event.isSet() and not kill_event.isSet():
+        while not evo_data and not shutdown_event.is_set() and not kill_event.is_set():
             try:
                 port = findEvo()
                 evo = serial.Serial(port, baudrate=115200, timeout=2)
@@ -278,14 +279,14 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
         print("{MainFile} : Issue starting threads")
 
 
-    if shutdown_event.isSet():
+    if shutdown_event.is_set():
         print("[MainProcess] : STOP BUTTON PRESSED")
-    if kill_event.isSet():
+    if kill_event.is_set():
         print("[MainProcess] : EXITING...")
         sys.exit()
 
     # ___________ "MAIN THREAD" LOOP __________ #
-    while not shutdown_event.isSet() and not kill_event.isSet():
+    while not shutdown_event.is_set() and not kill_event.is_set():
         if drillType == "Dynamic":
             if working_on_the_Pi:
                 if loop_count % 2 == 0:
@@ -295,43 +296,46 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
 
             loop_count += 1
             if loop_count == 100:
-                print("[MainProcess] : FUT_FINAL_DIST =   " + str(FUT_FINAL_DIST))
+                #print("[MainProcess] : FUT_FINAL_DIST =   " + str(FUT_FINAL_DIST))
                 loop_count = 1
 
             StartTime = time.time()
             # Get(WAIT) for stereoDistance _____________________________
             stereo = False
-            while not stereo and not shutdown_event.isSet() and not kill_event.isSet():
+            while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
                 try:
-                    tempData = stereo_py_main.get(timeout=1)
+                    tempData = stereo_py_main.get(timeout=0.1)
                     stereo_Distance = float(tempData[2])
                     stereo = True
                 except AttributeError as att:
-                    print("[MainProcess] : No data in stereoStack" + str(att))
-                    while not stereo and not kill_event.isSet():
-                        try:
-                            tempData = stereo_py_main.get(timeout=1)
-                            stereo_Distance = float(tempData[2])
-                            stereo_present = True
-                        except:
-                            #print("[MainProcess] : Waiting for Stereo...")
-                            sys.stdout.flush()
-                            time.sleep(0.1)
-                            continue
+                    #print("[MainProcess] : No data in stereoStack" + str(att))
+                    pass
+                
+#                    while not stereo and not kill_event.is_set():
+#                        try:
+#                            tempData = stereo_py_main.get(timeout=1)
+#                            stereo_Distance = float(tempData[2])
+#                            stereo= True
+#                        except:
+#                            #print("[MainProcess] : Waiting for Stereo...")
+#                            sys.stdout.flush()
+#                            time.sleep(0.1)
+#                            continue
 
                 except Exception as q:
-                    print("[MainProcess] : No data in stereoStack" + str(q))
-                    while not stereo and not shutdown_event.isSet() and not kill_event.isSet():
-                        try:
-                            tempData = stereo_py_main.get(timeout=1)
-                            stereo_Distance = float(tempData[2])
-                            stereo_present = True
-                        except:
-                            print("[MainProcess] : Waiting for Stereo...")
-                            time.sleep(3)
-                            continue
-                else:
-                    print("[MainProcess] :  ", stereo_Distance)
+                    #print("[MainProcess] : No data in stereoStack" + str(q))
+                    pass
+#                    while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
+#                        try:
+#                            tempData = stereo_py_main.get(timeout=1)
+#                            stereo_Distance = float(tempData[2])
+#                            stereo = True
+#                        except:
+#                            print("[MainProcess] : Waiting for Stereo...")
+#                            time.sleep(3)
+#                            continue
+                #else:
+                    #print("[MainProcess] :  ", stereo_Distance)
 
             if 1 <= stereo_Distance <= 35:  # Meters
                 rationaleDistMeasures = 1
@@ -352,19 +356,19 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
                         #     lidar1Stack.push(None)  # << None value indicates no GOOD new data
 
                     except Exception as w:
-                        print("[MainProcess] : LIDAR_1 -> no data" + str(w))
+                        #print("[MainProcess] : LIDAR_1 -> no data" + str(w))
                         pass
 
                 # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
                 try:
                     MEGA_DATA = mega_data.get_nowait()
                     LIDAR_2_Distance = MEGA_DATA.lidar_2_Distance
-                    print("[MainProcess] : ", LIDAR_2_Distance)
+                    #print("[MainProcess] : ", LIDAR_2_Distance)
                     if LIDAR_2_Distance is not None and abs(stereo_Distance - LIDAR_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                         rationaleDistMeasures += 1
                         distanceTotal += LIDAR_2_Distance
                 except Exception as w:
-                    print("[MainProcess] : LIDAR_2 -> no data" + str(w))
+                    #print("[MainProcess] : LIDAR_2 -> no data" + str(w))
                     pass
 
                 PRE_FINAL_DIST = distanceTotal / rationaleDistMeasures
@@ -399,15 +403,16 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
                     z_dist_deque.appendleft(PRE_FINAL_DIST)
                     z_dist_deque.pop()
 
+
                 final_dist_l.put(PRE_FINAL_DIST)
                 final_dist_py.put(PRE_FINAL_DIST)
-
+                #print("[MainProcess] : sent final dist to launcher and pitchyaw")
                 future_dist_l.put(FUT_FINAL_DIST)
                 future_dist_py.put(FUT_FINAL_DIST)
 
 
 
-            elif not shutdown_event.isSet() and not kill_event.isSet():
+            elif not shutdown_event.is_set() and not kill_event.is_set():
                 print("[MainProcess] : Player is not in Range")
                 # Activate GPIO pin for notification LED
                 # ***Do something about this***
@@ -430,7 +435,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
             print("[MainProcess] : no GUI data")
             time.sleep(1)
 
-    if shutdown_event.isSet():
+    if shutdown_event.is_set():
         print("[MainProcess] : STOP BUTTON PRESSED")
         for p in processes:
             if working_on_the_Pi:
@@ -443,7 +448,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
             print("[MainProcess] :  ", p)
         time.sleep(2)
 
-    elif kill_event.isSet():
+    elif kill_event.is_set():
         print("[MainProcess] : EXIT BUTTON PRESSED")
         for p in processes:
             if working_on_the_Pi:

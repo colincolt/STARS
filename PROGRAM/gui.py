@@ -1,10 +1,11 @@
 from guizero import App, Text, PushButton, Window, Slider, Picture, CheckBox
 import main_file as main
-from threading import Thread, Event
+from threading import Thread
+import multiprocessing as mp
 import sys
 
-shutdown_event = Event()
-kill_event = Event()
+shutdown_event = mp.Event()
+kill_event = mp.Event()
 
 global startThread
 

@@ -7,7 +7,7 @@ import cv2
 import imutils
 import sys
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 if working_on_the_Pi:
     try:
         from gpiozero import LED
@@ -64,9 +64,9 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event):
     jerseyLower2 = (170, 70, 70)  # currently set for red
     jerseyUpper2 = (180, 255, 255)
     pts = deque(maxlen=args["buffer"])
-    frame_width = 304
-    frame_height = 224
-    framerate = 30
+    frame_width = 640
+    frame_height = 448
+    framerate = 20
     resolution = (frame_width, frame_height)
     stereo_loop_count = 1
     print("[Stereo] : trying to connected")
@@ -96,12 +96,12 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event):
 
     def sendto_queue(left_xcoord,right_xcoord, start_time):
         disparity = abs(left_xcoord - right_xcoord)
-        distance = (focalsize * baseline) / (disparity * pixelsize)
+        distance = round((focalsize * baseline) / (disparity * pixelsize),2)
         # SENDS DATA TO Class, which can be pushed using Stacks's______________________________
-        data = "<", str(right_xcoord), ",", str(left_xcoord), ",", str(distance), ">"
+        data = str(right_xcoord), ",", str(left_xcoord), ",", str(distance)
         stereo_data.put(data)
         fps = time.time() - start_time
-        print("[Stereo] :   FPS =   ", fps)
+        #print("[Stereo] :   FPS =   ", distance)
 
     def connectClient():
         connected = False
@@ -272,7 +272,7 @@ if __name__ == "__main__":
         LeftXcoord = int(float(tempData[1]))
         stereoDist = float(tempData[2])
 
-        print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
+        # print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
 
 
 

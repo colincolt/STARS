@@ -55,18 +55,17 @@ def loop_counter(loop_number):
 def findMEGA():
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
-        # print(p)            # This causes each port's information to be printed out.
         if "0042" in p[2]:
             return (p[0])
     return ('NULL')
 
 
-def MegaData(MEGA, send_flag, send_data, send_mega_main):
+def MegaData(MEGA, send_flag, send_data, send_mega_main, kill_event):
     # Variables:
 
     mega_data = data_object
 
-    while True: #not shutdown_event.is_set() and not kill_event.is_set():
+    while not kill_event.is_set():
         getdata = False
         if MEGA.is_open:
             try:
@@ -83,7 +82,7 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main):
                     tempData = "".join(megaData)
                     getdata = True
                     # IF SEND FLAG IS SET, DATA IS SENT AFTER:
-                    print("before flag")
+                    #print("before flag")
                     if send_flag.is_set():
                         print("in if flag")
 
@@ -94,8 +93,7 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main):
                             print("[MegaDataThread] : SENT MEGA DATA:  " + data)
                         except serial.SerialException as e:
                             print("[MegaDataThread] : ** MEGA SEND FAILED **   " + str(e))
-                            while (
-                                    time.time() - startTime >= 0.5):# and not shutdown_event.is_set() and not kill_event.is_set():
+                            while (time.time() - startTime >= 0.5):# and not shutdown_event.is_set() and not kill_event.is_set():
                                 try:
                                     #MEGA.reset_output_buffer()
                                     MEGA.write(data.encode())
@@ -106,6 +104,9 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main):
                                         pass
                                 else:
                                     send_flag.clear()
+                        except:
+                            print("[MegaDataThread] : Issue sending data")
+                            pass
                         else:
                             send_flag.clear()
 
@@ -115,7 +116,7 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main):
                         tempData = tempData.strip("<")
                         tempData = tempData.strip(">")
                         tempData = tempData.split(",")
-                        print("[MegaDataThread] : Tempdata=  " + str(tempData))
+                        #print("[MegaDataThread] : Tempdata=  " + str(tempData))
 
                         lidar_2_Distance = int(tempData[0])  # lidarDistance = int(cm)
                         temperature = int(tempData[1])  # temperature = int()
@@ -131,7 +132,8 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main):
 
                         getMegaDataStack.push(mega_data)
                         
-                        send_mega_main.put(mega_data)
+                        send_mega_main.put(tempData)
+                        
                     except Exception as e:
                         print("[MegaDataThread] : Parsing Data:  " + str(e))
         else:
@@ -196,6 +198,7 @@ SEND to STACKS:
         self.drillCount = 1
         #self.MEGA = None
         self.OLD_FUT_FINAL_DIST = None
+        self.FUT_FINAL_DIST = None
         self.LaunchTime = None
         self.launch_loop_count = 1
         self.stereoData = None
@@ -206,8 +209,8 @@ SEND to STACKS:
 
         # LAUNCHER OPTIONS:
         self.WAIT_TIME = 0
-        self.DYNAMIC_WAIT_TIME = 3  # seconds
-        self.STATIC_WAIT_TIME = 5  # seconds
+        self.DYNAMIC_WAIT_TIME = 20  # seconds
+        self.STATIC_WAIT_TIME = 15  # seconds
         self.stereo_timeout = 2  # seconds
         self.mega_timeout = 0.5  # seconds
         self.ballfeed = "0"
@@ -216,14 +219,18 @@ SEND to STACKS:
         self.targetTiming = 0.0
         self.targetBallSpeed = 0
         self.startTime = 0.0
+        self.first_drill = True
         # ____________________
 
     def drill_wait_time(self):
         if self.LaunchTime is not None:
             while (time.time() - self.LaunchTime) < self.WAIT_TIME:
-                print("[Launcher] : Holding Loop for:  " + str(
-                    self.WAIT_TIME) + "  seconds  Waiting for results from target WIFI")
+                self.first_drill = False
+                #print("[Launcher] : Holding Loop for:  " + str(self.WAIT_TIME) + "  seconds  Waiting for results from target WIFI")
                 time.sleep(.1)
+        elif self.drillCount ==1:
+            print("[Launcher] : First Ball")
+            self.first_drill = True
 
     def wait_for_voice(self):
         while self.voiceCommand != self.beginVC and not self.kill_event.is_set():
@@ -293,22 +300,33 @@ SEND to STACKS:
 
         MotorSpeed = str(motorSpeed)
         # ***Randomize targetChoice
-        targetChoice = int(random.choice([1, 2, 3, 4]))
+        targetChoice = int(random.choice([1, 2]))#, 3, 4]))
         # CALCULATE THE ESTIMATED TOF:
         estimated_tof = (0.120617 * self.used_distance)*1000  # + difficulty_time
         estimated_tof = round(estimated_tof,2)
         #print(estimated_tof)
-        self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
-            self.difficulty) + ',' + self.ballfeed + ',' + str(estimated_tof) + '>'
+        if self.first_drill and self.ballfeed =="0":
+            self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ','+ str(targetChoice) +',-1,' + self.ballfeed + ',' + str(estimated_tof) + '>'
+        else:
+            self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
+                self.difficulty) + ',' + self.ballfeed + ',' + str(estimated_tof) + '>'
         # _____________________________________________________________________
 
         # ____________________ Write data to MEGA ____________________
         if (time.time() - self.startTime) <= 100:
+            print("[Launcher] : Sending launch data to stack and setting flag")
             send_mega_stack.push(self.send_data)
+            print("[Launcher] : BALL NUMBER :  ", self.drillCount)
             #time.sleep(0.2)
             self.send_flag.set()
-
+            while self.send_flag.is_set():
+                
+                time.sleep(0.1)
+                
+            if self.ballfeed =="0":
+                    time.sleep(4)
             if self.ballfeed =="1":
+                print("[Launcher] : LAUNCHING BALL")
                 self.drillCount += 1  # << ON SUCCESSFUL LAUNCH
                 self.LaunchTime = time.time()
 
@@ -343,14 +361,18 @@ SEND to STACKS:
                 self.wait_for_voice()
 
         launch_data = False
-        while not launch_data:
+        while not launch_data and not self.kill_event.is_set():
             try:
-                FINAL_DIST = self.get_final_dist.get()  # <<<<< GET PREDICTED LOCATION
+                FINAL_DIST = self.get_final_dist.get(timeout=2)  # <<<<< GET PREDICTED LOCATION
                 print("[Launcher] :  Final Dist : " + str(FINAL_DIST))
             except:
                 print("[Launcher] : Waiting for final distance")
                 time.sleep(2)
                 continue
+            else:
+                self.used_distance = FINAL_DIST
+                launch_data = True
+                self.send_launch_data()
             # # ___________________       GARMIN LIDAR:    _______________________________ #
         #
         # if self.lidar_2_Distance is not None and abs(self.stereo_Distance - self.lidar_2_Distance) <= 5:
@@ -382,9 +404,9 @@ SEND to STACKS:
         # else:
         #     print("[Launcher] : FINAL_DIST:  " + str(FINAL_DIST))
 
-            self.used_distance = FINAL_DIST
+            
 
-            self.send_launch_data()
+            
 
     def launcher_startup(self):
         startData = False
@@ -400,8 +422,7 @@ SEND to STACKS:
                 MEGA.baudrate = 115200
 
                 # START COMMUNICATIONS THREAD
-                mega_data_thread = Thread(target=MegaData,
-                                          args=[MEGA, self.send_flag, send_mega_stack, self.send_mega_data])
+                mega_data_thread = Thread(target=MegaData,args=[MEGA, self.send_flag, send_mega_stack, self.send_mega_data, self.kill_event])
                 mega_data_thread.start()
 
             except serial.SerialException as err:
@@ -466,36 +487,57 @@ SEND to STACKS:
 
                 # _____ GET FUT_FINAL_DIST (No Wait)
                 if self.OLD_FUT_FINAL_DIST is not None:
-                    self.OLD_FUT_FINAL_DIST = FUT_FINAL_DIST
+                    self.OLD_FUT_FINAL_DIST = self.FUT_FINAL_DIST
 
                 try:
-                    FUT_FINAL_DIST = self.get_future_dist.get()  # <<<<< GET PREDICTED LOCATION
-                    print(FUT_FINAL_DIST)
+                    
+                    self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 1)  # <<<<< GET PREDICTED LOCATION
+                    #print(FUT_FINAL_DIST)
                 except:
-                    FUT_FINAL_DIST = None
+                    print("[Launcher] : Failed to get FUT FINAL DIST")
+                    self.FUT_FINAL_DIST = None
                     pass
-                else:
-                    if FUT_FINAL_DIST == 0.0 or FUT_FINAL_DIST == self.OLD_FUT_FINAL_DIST:  # <- no prediction is done in this thread so it will send AS IS
+                finally:
+                    print("[Launcher] : in the finally")
+                    if not self.FUT_FINAL_DIST or self.FUT_FINAL_DIST == self.OLD_FUT_FINAL_DIST:  # <- no prediction is done in this thread so it will send AS IS
+                        print("[Launcher] : Sending launch data as is")
+                        self.ballfeed = "1"
 
-                        self.ballFeed = "1"
-
-                        self.send_launch_data()
-
+                        self.launch_motors()
+                        #self.OLD_FUT_FINAL_DIST = FUT_FINAL_DIST
                     else:
-                        self.used_distance = FUT_FINAL_DIST
-                        self.ballFeed = "1"
+                        print("[Launcher] : in the else")
+                        self.used_distance = self.FUT_FINAL_DIST
+                        self.ballfeed = "1"
 
-                        self.send_launch_data()
+                        self.launch_motors()
 
-        if self.drillCount == 5:
+        print("Drill Ending  ",self.drillCount)
+        if self.drillCount >= 5:
+            time.sleep(20)
             print("[Launcher] : Drill COMPLETE!")
+            self.send_data = '<0,0,0,6,0,0.0>'
+            send_mega_stack.push(self.send_data)
+            self.send_flag.set()
+            while self.send_flag.is_set():
+                time.sleep(0.1)
 
         elif self.kill_event.is_set():
             print("[Launcher] :  Closing process")
+            self.send_data = '<0,0,0,6,0,0.0>'
+            send_mega_stack.push(self.send_data)
+            self.send_flag.set()
+            while self.send_flag.is_set():
+                time.sleep(0.1)
             sys.exit()
 
         else:
             print("[Launcher] : Not sure what went wrong")
+            self.send_data = '<0,0,1,6,0,0.0>'
+            send_mega_stack.push(self.send_data)
+            self.send_flag.set()
+            while self.send_flag.is_set():
+                time.sleep(0.1)
 
     def static_drill(self):
         self.WAIT_TIME = self.STATIC_WAIT_TIME
@@ -652,7 +694,7 @@ if __name__ == "__main__":
     if EvoLidar:
         evo_data = False
 
-        while not evo_data and not shutdown_event.isSet() and not kill_event.isSet():
+        while not evo_data and not shutdown_event.is_set() and not kill_event.is_set():
             try:
                 port = findEvo()
                 evo = serial.Serial(port, baudrate=115200, timeout=2)
@@ -684,7 +726,7 @@ if __name__ == "__main__":
     # START LAUNCHER
     Launcher(guiData, mega_data, final_dist_l, future_dist_l, working_on_the_Pi, WHITE, kill_event)
 
-    while not shutdown_event.isSet() and not kill_event.isSet():
+    while not shutdown_event.is_set() and not kill_event.is_set():
         if drillType == "Dynamic":
             if working_on_the_Pi:
                 if loop_count % 2 == 0:
@@ -700,14 +742,14 @@ if __name__ == "__main__":
             StartTime = time.time()
             # Get(WAIT) for stereoDistance _____________________________
             stereo = False
-            while not stereo and not shutdown_event.isSet() and not kill_event.isSet():
+            while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
                 try:
                     tempData = stereo_data.get(timeout=1)
                     stereo_Distance = float(tempData[2])
                     stereo = True
                 except AttributeError as att:
                     print("[MainProcess] : No data in stereoStack" + str(att))
-                    while not stereo and not kill_event.isSet():
+                    while not stereo and not kill_event.is_set():
                         try:
                             tempData = stereo_data.get(timeout=1)
                             stereo_Distance = float(tempData[2])
@@ -720,7 +762,7 @@ if __name__ == "__main__":
 
                 except Exception as q:
                     print("[MainProcess] : No data in stereoStack" + str(q))
-                    while not stereo and not shutdown_event.isSet() and not kill_event.isSet():
+                    while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
                         try:
                             tempData = stereo_data.get(timeout=1)
                             stereo_Distance = float(tempData[2])

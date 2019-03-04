@@ -178,17 +178,17 @@ SEND to STACKS:
         #                                    [23, 36],
         #                                    [25, 37]])
 
-        self.pitchAngleTable = np.array([[5, 27],  # << Pitch angle lookup table based on estimations
-                                         [7, 28],
-                                         [9, 29],
-                                         [11, 30],
-                                         [13, 31],
-                                         [15, 32],
-                                         [17, 33],
-                                         [19, 34],
-                                         [21, 35],
-                                         [23, 36],
-                                         [25, 37]])
+        self.pitchAngleTable = np.array([[5, 15],  # << Pitch angle lookup table based on estimations
+                                         [7, 16],
+                                         [9, 17],
+                                         [11, 18],
+                                         [13, 19],
+                                         [15, 20],
+                                         [17, 21],
+                                         [19, 22],
+                                         [21, 23],
+                                         [23, 24],
+                                         [25, 25]])
 
 
 
@@ -211,8 +211,8 @@ SEND to STACKS:
         row = round((self.usedDistance - 0.99) / 2) - 2
         if row < 0:
             row = 0
-        elif row > 11:
-            row = 11
+        elif row > 10:
+            row = 10
         pitchAngle = self.pitchAngleTable[row, 1] + self.launcherAngle
 
 # ''' PID CALCULATION:(scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)'''
@@ -439,10 +439,10 @@ SEND to STACKS:
                         self.usedDistance = FINAL_DIST
                     else:
                         self.usedDistance = self.stereoDist
-                    FPS = time.time() - start_time
+                    #FPS = time.time() - start_time
 #                    print("[PitchYaw] : drill b4 motor_controll ", FPS)
                     self.motor_controller()
-                    FPS = time.time() - start_time
+                    #FPS = time.time() - start_time
 #                    print("[PitchYaw] : drill after motor_controll ", FPS) # <<<<<SEND DATA TO MOTORS
 
                 # time.sleep(0.1)
