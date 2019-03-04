@@ -123,7 +123,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event):
                 sys.stdout.flush()
                 time.sleep(3)
                 continue
-        sys.exit()
+#        sys.exit()
 
     def ProcessLoop():  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution):
         stereo_loop_count = 1
@@ -181,19 +181,27 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event):
                 # only proceed if the radius meets a minimum
 
             right_xcoord = receive_data()
-
+            #fps = time.time() - start_time
+            #print("FPS =  ",fps)
             if len(cnts) > 0:
-                right_xcoord = float(right_xcoord)
-                left_xcoord = centroid[0]
-                sendto_queue(left_xcoord,right_xcoord,start_time)
-
+                try:
+                    right_xcoord = float(right_xcoord)
+                    left_xcoord = centroid[0]
+                    sendto_queue(left_xcoord,right_xcoord,start_time)
+                except ValueError as val:
+                    print("Value Error:  ->  ",val)
+        
 
         if kill_event.is_set():
+            
+            print("[Stereo] : closing socket connection")
+#            clientPort.shutdown()
             PiVideoStream().stop()
+            clientPort.close()
             # PiVideoStream().stream.close()
             # PiVideoStream().rawCapture.close()
             # PiVideoStream().camera.close()
-            clientPort.shutdown()
+            
             print('[Stereo] : Closing Camera...')
 
 
@@ -218,7 +226,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event):
 
         def update(self):
             # keep looping infinitely until the thread is stopped
-            while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
+            # while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
                 for f in self.stream:
                     # grab the frame from the stream and clear the stream in
                     # preparation for the next frame

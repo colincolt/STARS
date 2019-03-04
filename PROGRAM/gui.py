@@ -3,9 +3,11 @@ import main_file as main
 from threading import Thread
 import multiprocessing as mp
 import sys
+import time
 
 shutdown_event = mp.Event()
 kill_event = mp.Event()
+
 
 global startThread
 
@@ -35,12 +37,26 @@ class gui_app():
         print("This is the STOP command")
 
     def exit_command(self, sender):
+        sender = sender
+        senderstr = str(sender)
         kill_event.set()
-        print("EXITING...")
-        try:
-            startThread.join()
-        except:
-            pass
+        time.sleep(10)
+        print("[GUI] : EXITING...")
+        thread_not_joined = False
+        while thread_not_joined:
+            try:
+                startThread.join()
+                print("[GUI] : in try")
+                thread_not_joined = True
+            except:
+                print("[GUI] : in except")
+                continue
+        if senderstr == app:
+            sender.destroy()
+        else:        
+            sender.hide()
+        
+        print("[GUI] : closing")
         sys.exit()
 
     def PitchYaw_Only_Cmd(self):
@@ -64,7 +80,8 @@ class gui_app():
         self.START(ballSpeed, difficulty, drillType)
         # print("This is the START command")
 
-    def staticDrill(self):
+    def staticDrill(self,appname):
+        appname = appname
         second_message.value = "Static Passing Selected"
         self.drillType = "Static"
 
@@ -92,7 +109,7 @@ class gui_app():
         Evo_1 = CheckBox(window1, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_1 = PushButton(window1, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_1 = PushButton(window1, command=self.stop_command, args=[], text="Stop")
-        exit_1 = PushButton(window1, command=self.exit_command, args=["window"], text="Exit")
+        exit_1 = PushButton(window1, command=self.exit_command, args=[appname], text="Exit")
         PitchYaw_1.text_color = "white"
         Launcher_1.text_color = "white"
         Evo_1.text_color = "white"
@@ -109,7 +126,8 @@ class gui_app():
         start_1.text_color = "white"
         stop_1.text_color = "white"
 
-    def predictiveDrill(self):
+    def predictiveDrill(self,appname):
+        appname = appname
         second_message.value = "Entering Predictive Passing Mode"
         self.drillType = "Dynamic"
         window2 = Window(app, bg="darkgreen")
@@ -135,7 +153,7 @@ class gui_app():
         Evo_2 = CheckBox(window2, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_2 = PushButton(window2, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_2 = PushButton(window2, command=self.stop_command, args=[], text="stop")
-        exit_2 = PushButton(window2, command=self.exit_command, args=["window"], text="Exit")
+        exit_2 = PushButton(window2, command=self.exit_command, args=[appname], text="Exit")
         PitchYaw_2.text_color = "white"
         Launcher_2.text_color = "white"
         Evo_2.text_color = "white"
@@ -152,7 +170,7 @@ class gui_app():
         start_2.text_color = "white"
         stop_2.text_color = "white"
 
-    def manualDrill(self):
+    def manualDrill(self,appname):
         second_message.value = "Entering Manual Mode"
         self.drillType = "Manual"
 
@@ -172,7 +190,7 @@ class gui_app():
         Evo_3 = CheckBox(window3, command=self.No_Evo, args=[], text="No Evo Lidar")
         start_3 = PushButton(window3, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType], text="Begin")
         stop_3 = PushButton(window3, command=self.stop_command, args=[], text="stop")
-        exit_3 = PushButton(window3, command=self.exit_command, args=["window"], text="Exit")
+        exit_3 = PushButton(window3, command=self.exit_command, args=[appname], text="Exit")
         PitchYaw_3.text_color = "white"
         Launcher_3.text_color = "white"
         Evo_3.text_color = "white"
@@ -201,13 +219,13 @@ logo.resize(200, 200)
 
 print('looping')
 
-drill_1 = PushButton(app, command=gui_app().staticDrill, text="Static Passing")
+drill_1 = PushButton(app, command=gui_app().staticDrill, args=[app], text="Static Passing")
 drill_1.width = 30
-drill_2 = PushButton(app, command=gui_app().predictiveDrill, text="Predictive Passing")
+drill_2 = PushButton(app, command=gui_app().predictiveDrill,args=[app], text="Predictive Passing")
 drill_2.width = 30
-drill_3 = PushButton(app, command=gui_app().manualDrill, text="Manual Mode")
+drill_3 = PushButton(app, command=gui_app().manualDrill,args=[app], text="Manual Mode")
 drill_3.width = 30
-exit_1 = PushButton(app, command=gui_app().exit_command, args=["app"], text="Exit")
+exit_1 = PushButton(app, command=gui_app().exit_command, args=[app], text="Exit")
 exit_1.width = 20
 exit_1.bg = "red"
 

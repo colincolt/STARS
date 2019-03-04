@@ -166,7 +166,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
     measure_time_deque = deque([])
 
     # COMMUNICATION
-    stereo_parent, stereo_child = mp.Pipe()
+#    stereo_parent, stereo_child = mp.Pipe()
     stereo_data = mp.Queue()
     stereo_py_main = mp.Queue()
     mega_data = mp.Queue()
@@ -194,6 +194,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
     EvoLidar = EvoStart
     kill_event = kill_event
     shutdown_event = shutdown_event
+    py_reset_event = mp.Event()
     stereo_Distance = 0.0
     loop_count = 1
 
@@ -249,7 +250,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
 
     if StartPitchYaw:
         try:
-            processes.append(pitch_yaw.PitchYaw(guiData, stereo_data, stereo_py_main, final_dist_py, future_dist_py,  working_on_the_Pi, YELLOW, kill_event))
+            processes.append(pitch_yaw.PitchYaw(guiData, stereo_data, stereo_py_main, final_dist_py, future_dist_py,  working_on_the_Pi, YELLOW, kill_event, py_reset_event))
             
             if working_on_the_Pi:
                 RED_2.on()
@@ -281,8 +282,27 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
 
     if shutdown_event.is_set():
         print("[MainProcess] : STOP BUTTON PRESSED")
+        print("[MainProcess] : STOP BUTTON PRESSED")
+        for p in processes:
+            if working_on_the_Pi:
+                RED_1.off()
+                RED_2.off()
+                RED_3.off()
+            time.sleep(1)
+            p.terminate()
+            p.join()
+            print("[MainProcess] :  ", p)
     if kill_event.is_set():
         print("[MainProcess] : EXITING...")
+        for p in processes:
+            if working_on_the_Pi:
+                RED_1.off()
+                RED_2.off()
+                RED_3.off()
+            time.sleep(1)
+            p.terminate()
+            p.join()
+            print("[MainProcess] :  ", p)
         sys.exit()
 
     # ___________ "MAIN THREAD" LOOP __________ #
@@ -406,7 +426,7 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
 
                 final_dist_l.put(PRE_FINAL_DIST)
                 final_dist_py.put(PRE_FINAL_DIST)
-                #print("[MainProcess] : sent final dist to launcher and pitchyaw")
+#                print("[MainProcess] : sent final : ",PRE_FINAL_DIST)
                 future_dist_l.put(FUT_FINAL_DIST)
                 future_dist_py.put(FUT_FINAL_DIST)
 
@@ -450,6 +470,11 @@ def startMainFile(speed, difficulty, drillType, shutdown_event, kill_event, Pitc
 
     elif kill_event.is_set():
         print("[MainProcess] : EXIT BUTTON PRESSED")
+        py_reset_event.set()
+        while py_reset_event.is_set():
+            time.sleep(0.5)
+            print("[MainFile] : waiting for yaw motor reset")
+        
         for p in processes:
             if working_on_the_Pi:
                 RED_1.off()
