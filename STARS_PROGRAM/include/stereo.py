@@ -66,7 +66,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera):
     args = vars(ap.parse_args())
 
     # define the lower and upper boundaries of the jersey ball in the HSV color space, then initialize the list of tracked points
-    if LOCATION == "hall"
+    if LOCATION == "hall":
         jerseyLower1 = (0, 60, 60)  # currently set for red
         jerseyUpper1 = (5, 255, 255)
         jerseyLower2 = (175, 60, 60)  # currently set for red
