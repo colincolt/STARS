@@ -14,7 +14,7 @@ STACKS:
 <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
 <     https://www.pythoncentral.io/stack-tutorial-python-implementation/  '''
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 # Packages
 # import include.stereo as stereo
