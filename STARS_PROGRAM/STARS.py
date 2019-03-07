@@ -279,6 +279,7 @@ class gui_app():
 
         send = PushButton(self.window4, command=self.send_data, args=[], text="LAUNCH")
         send.width = 30
+        send.bg = "orange"
 
         exit = PushButton(self.window4, command=self.close_test, args=[self.window4], text="Close")
         exit.bg = "red"
