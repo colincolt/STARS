@@ -7,13 +7,10 @@ import cv2
 import imutils
 import sys
 
-# LOCATION OPTIONS ARE:
-# - hall
-# - gym
-# - capstone
-LOCATION = "capstone"
+LOCATION = "capstone pink"
 
-working_on_the_Pi = False
+working_on_the_Pi = True
+
 if working_on_the_Pi:
     try:
         from gpiozero import LED
@@ -53,12 +50,11 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     GREEN = led_color
     working_on_the_Pi = pi_no_pi
     kill_event = kill_event
-    pause_event = pause_event
     show_camera = show_camera
 
     TCP_IP = '169.254.116.12'
     TCP_PORT = 5025
-    BUFFER_SIZE = 1024
+    BUFFER_SIZE = 128
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     ap = argparse.ArgumentParser()
@@ -67,22 +63,20 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     args = vars(ap.parse_args())
 
     # define the lower and upper boundaries of the jersey ball in the HSV color space, then initialize the list of tracked points
-    if LOCATION == "hall":
+    if LOCATION == "hallway":
         jerseyLower1 = (0, 60, 60)  # currently set for red
         jerseyUpper1 = (5, 255, 255)
         jerseyLower2 = (175, 60, 60)  # currently set for red
         jerseyUpper2 = (180, 255, 255)
-
-    if LOCATION == "capstone":
+    elif LOCATION == "capstone":
         jerseyLower1 = (0, 50, 50)  # currently set for red
         jerseyUpper1 = (5, 255, 255)
         jerseyLower2 = (175, 50, 50)  # currently set for red
         jerseyUpper2 = (180, 255, 255)
-
-    if LOCATION == "gym":
-        print("Havent setup yet")
-
-
+    elif LOCATION == "capstone pink":
+        jerseyLower = (160, 60, 60)
+        jerseyUpper = (170, 255, 255)
+        
     pts = deque(maxlen=args["buffer"])
     frame_width = 640
     frame_height = 448
@@ -134,10 +128,6 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     def connectClient():
         connected = False
         while not connected and not kill_event.is_set(): # and not shutdown_event.is_set() and not kill_event.is_set():  # Wait for client
-            if pause_event.is_set():
-                print("[Launcher] : Paused Drill")
-                while pause_event.is_set():
-                    time.sleep(1)
             try:
                 s.bind((TCP_IP, TCP_PORT))
                 s.listen(1)
@@ -160,15 +150,16 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     def ProcessLoop():  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution):
         stereo_loop_count = 1
         while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
+            if pause_event.is_set():
+                print("[MainProcess] : PAUSE BUTTON PRESSED")
+                while pause_event.is_set():
+                    time.sleep(1)
+                
             start_time = time.time()
             if working_on_the_Pi:
                 gpio_blinker(GREEN, stereo_loop_count)
 
             stereo_loop_count = loop_counter(stereo_loop_count)
-
-            if pause_event.is_set():
-                time.sleep(0.5)
-                print("[Stereo] : Paused Drill")
 
             try:
                 image = vs.read()
@@ -194,9 +185,13 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
             blurred = cv2.GaussianBlur(image, (11, 11), 0)
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-            mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
-            mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
-            mask = mask0 + mask1
+            if LOCATION == "capstone pink":
+                mask = cv2.inRange(hsv, jerseyLower, jerseyUpper)
+            else:
+                mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
+                mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
+                mask = mask0 + mask1
+                
             mask = cv2.erode(mask, None, iterations=2)
             mask = cv2.dilate(mask, None, iterations=2)
 
@@ -220,16 +215,18 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                         cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
                         cv2.circle(image, center, 5, (0, 0, 255), -1)
 
-                    cv2.imshow("Frame", image)
+                    cv2.imshow("Frame", mask)  #  mask
                     key = cv2.waitKey(1) & 0xFF
 
-                right_xcoord = receive_data()
-                #fps = time.time() - start_time
-                #print("FPS =  ",fps)
+                right_xcoords = receive_data()
+                right_xcoords = right_xcoords.split('>')
+                right_xcoord = right_xcoords[0]
+                fps = time.time() - start_time
+                print("FPS =  ",fps,"  right x coord:  ",right_xcoord)
 
                 try:
                     right_xcoord = float(right_xcoord)
-                    left_xcoord = centroid[0]
+                    left_xcoord = int(centroid[0])
                     sendto_queue(left_xcoord,right_xcoord,start_time)
                 except ValueError as val:
                     print("Value Error:  ->  ",val)
@@ -303,11 +300,14 @@ if __name__ == "__main__":
 
     stereo_data = mp.Queue()
     kill_event = Event()
+    show_camera = Event()
+    pause_event = Event()
+    show_camera.set()
     working_on_the_Pi = True
     if working_on_the_Pi:
         GREEN = LED(16)
 
-    mp.Process(target=Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event]).start()
+    mp.Process(target=Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event,show_camera,pause_event]).start()
 
     while True:
         data = stereo_data.get()
@@ -319,7 +319,7 @@ if __name__ == "__main__":
         LeftXcoord = int(float(tempData[1]))
         stereoDist = float(tempData[2])
 
-        print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
+#        print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
 
 
 

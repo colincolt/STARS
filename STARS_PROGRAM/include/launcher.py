@@ -224,15 +224,26 @@ SEND to STACKS:
         # ____________________
 
     def drill_wait_time(self):
-        if self.pause_event.is_set():
-            time.sleep(0.5)
-            print("[Launcher] : Paused Drill")
-
+        
         if self.LaunchTime is not None:
-            while (time.time() - self.LaunchTime) < self.WAIT_TIME:
+            while (time.time() - self.LaunchTime) < self.WAIT_TIME and not self.kill_event.is_set():
+                if self.pause_event.is_set():
+                    print("[Launcher] : Paused Drill")
+                    while self.pause_event.is_set():
+                        time.sleep(1)
+                    
                 self.first_drill = False
                 #print("[Launcher] : Holding Loop for:  " + str(self.WAIT_TIME) + "  seconds  Waiting for results from target WIFI")
                 time.sleep(.1)
+                
+                if self.kill_event.is_set():
+                    print("[Launcher] :  Closing process")
+                    self.send_data = '<0,0,0,6,0,0.0>'
+                    send_mega_stack.push(self.send_data)
+                    self.send_flag.set()
+                    while self.send_flag.is_set():
+                        time.sleep(0.1)
+                    sys.exit()
         elif self.drillCount ==1:
             print("[Launcher] : First Ball")
             self.first_drill = True
@@ -249,6 +260,11 @@ SEND to STACKS:
                 print("[Launcher] : Waiting for Voice Command")
                 time.sleep(1)
                 continue
+            
+            if self.pause_event.is_set():
+                print("[Launcher] : Paused Drill")
+                while self.pause_event.is_set():
+                    time.sleep(1)
 
 
     def get_mega_data(self):

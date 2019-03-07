@@ -14,7 +14,7 @@ STACKS:
 <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
 <     https://www.pythoncentral.io/stack-tutorial-python-implementation/  '''
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 # Packages
 # import include.stereo as stereo
@@ -271,6 +271,23 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
 
                     FINAL_DIST = distanceTotal / rationaleDistMeasures
                     return FINAL_DIST
+        if kill_event.is_set():
+            print("[MainProcess] : EXIT BUTTON PRESSED")
+            py_reset_event.set()
+            while py_reset_event.is_set():
+                time.sleep(0.5)
+                print("[MainFile] : waiting for yaw motor reset")
+            
+            for p in processes:
+                if working_on_the_Pi:
+                    RED_1.off()
+                    RED_2.off()
+                    RED_3.off()
+                time.sleep(1)
+                p.terminate()
+                p.join()
+                print("[MainProcess] :  ", p)
+            sys.exit()
 
 
     # ___ OPEN SERIAL PORT/S ___ #
