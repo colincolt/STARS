@@ -41,7 +41,8 @@ class gui_app():
             self.difficulty = difficulty
             self.drillType = drillType
             self.startThread = Thread(target=StartProgram, args=[ballSpeed, difficulty, drillType])
-            self.startThread.start()
+            if not self.startThread.isAlive():
+                self.startThread.start()
 
     def pause_command(self, sender):
         sender = sender
@@ -53,7 +54,8 @@ class gui_app():
             print("[GUI] : Drill not started")
 
     def exit_command(self, appname, window):
-
+        if pause_event.is_set():
+            pause_event.clear()
         appname = appname
         senderstr = str(appname)
         window = window
@@ -71,13 +73,14 @@ class gui_app():
                     except:
                         print("[GUI] : in except")
                         continue
-                window.hide()
-                appname.destroy()
 
-                print("[GUI] : closing")
-                sys.exit()
         except:
+            print("Leaving before starting drill?")
+        finally:
             window.hide()
+            # appname.destroy()
+            # print("[GUI] : closing")
+            # sys.exit()
 
     def PitchYaw_Only_Cmd(self):
         self.Launcher = False
@@ -279,7 +282,7 @@ class gui_app():
 
         send = PushButton(self.window4, command=self.send_data, args=[], text="LAUNCH")
         send.width = 30
-        send.bg = "orange"
+        send.bg="orange"
 
         exit = PushButton(self.window4, command=self.close_test, args=[self.window4], text="Close")
         exit.bg = "red"
