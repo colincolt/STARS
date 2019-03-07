@@ -250,31 +250,6 @@ SEND to STACKS:
                 time.sleep(1)
                 continue
 
-    # def get_stereodata(self):
-    #     # ___________________ RECEIVE STEREO DISTANCE (NO TIMEOUT (slow startup)_________________________________#
-    #     break_loop = False
-    #     while not break_loop: # and not self.shutdown_event.is_set() and not self.kill_event.is_set():
-    #         try:
-    #             self.stereoData = self.stereo_pitch_launch.get()
-    #             self.stereo_Distance = float(self.stereoData.distance)
-    #             # print("[Launcher(Thread)] : stereo_Distance =  " + str(stereo_Distance))
-    #         except ValueError as verr:
-    #             print("[Launcher] : StereoDistance couldnt be converted to float" + str(verr))
-    #             if self.stereoData is None:
-    #                 print("[Launcher] : ... because Stack is Empty")
-    #                 continue
-    #             else:
-    #                 bad_val = self.stereo_pitch_launch.get()
-    #                 print("[Launcher] : issue with stereo data  :  " ,bad_val,  ", removing it and trying again")
-    #                 continue
-    #         except Exception as e:
-    #             print("[Launcher] : Error getting stereo_pitch_yaw" + str(e))
-    #             time.sleep(0.1)
-    #             continue
-    #         else:
-    #             self.distanceTotal = self.stereo_Distance
-    #             self.rationaleDistMeasures = 1
-    #             break_loop = True
 
     def get_mega_data(self):
         # _______ RECEIVE MEGA DATA (Wait): lidar_2_Distance, voiceCommand, targetTiming, targetBallSpeed _______#
@@ -376,36 +351,6 @@ SEND to STACKS:
                 self.used_distance = FINAL_DIST
                 launch_data = True
                 self.send_launch_data()
-            # # ___________________       GARMIN LIDAR:    _______________________________ #
-        #
-        # if self.lidar_2_Distance is not None and abs(self.stereo_Distance - self.lidar_2_Distance) <= 5:
-        #     self.distanceTotal += self.lidar_2_Distance
-        #     self.rationaleDistMeasures += 1
-        #     print("[Launcher] : lidar_2_Distance:  " + str(self.lidar_2_Distance))
-        #
-        # # ___________________       EVO LIDAR:    _______________________________ #
-        #
-        # try:
-        #     lidar_1_Distance = self.getLidar1Stack.peek()
-        #     lidar_1_Distance = lidar_1_Distance / 1000  # <<<<<< CONVERT to meters from mm
-        #     if lidar_1_Distance is not None and abs(
-        #             self.stereo_Distance - lidar_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-        #         self.rationaleDistMeasures += 1
-        #         self.distanceTotal += lidar_1_Distance
-        #         print("[Launcher] : lidar_1_Distance:  " + str(lidar_1_Distance))
-        # except Exception as stackemp:
-        #     print("[Launcher] : LIDAR_1 -> nothing in Lidar1Stack" + str(stackemp))
-        #     pass
-        #
-        # # CALCULATE AND SEND TOTAL TO MAIN THREAD
-        # try:
-        #     FINAL_DIST = self.distanceTotal / self.rationaleDistMeasures
-        #     self.sendfinalDistStack.push(FINAL_DIST)
-        # except ZeroDivisionError:
-        #     print("[Launcher] : ** No VALID distance data **")
-        #       # < Go back to the beginning and try again
-        # else:
-        #     print("[Launcher] : FINAL_DIST:  " + str(FINAL_DIST))
 
     def launcher_startup(self):
         startData = False
@@ -413,6 +358,12 @@ SEND to STACKS:
             self.drillSpeed = self.gui_data.speed
             self.difficulty = self.gui_data.difficulty
             self.drillType = self.gui_data.drilltype
+
+            if self.pause_event.is_set():
+                print("[Launcher] : Paused Drill")
+                while self.pause_event.is_set():
+                    time.sleep(1)
+
             try:
 
                 # INSTANTIATE THE SERIAL PORT:
@@ -456,6 +407,11 @@ SEND to STACKS:
         gpio_blinker(self.color, self.launch_loop_count, self.working_on_the_Pi)
 
         self.launch_loop_count = loop_counter(self.launch_loop_count)
+
+        if self.pause_event.is_set():
+            print("[Launcher] : Paused Drill")
+            while self.pause_event.is_set():
+                time.sleep(1)
 
         self.drill_wait_time()
 
@@ -511,7 +467,7 @@ SEND to STACKS:
 
                         self.launch_motors()
 
-        print("Drill Ending  ",self.drillCount)
+        print("[Launcher] : Drill Ending  ",self.drillCount)
         if self.drillCount >= 5:
             time.sleep(20)
             print("[Launcher] : Drill COMPLETE!")
@@ -612,256 +568,3 @@ SEND to STACKS:
 
         except Exception as e:
             print('[Launcher] : failed because of exception: ' + str(e))
-
-
-
-
-
-
-if __name__ == "__main__":
-
-    import stereo
-    from collections import deque
-
-    def findEvo():
-        ports = list(serial.tools.list_ports.comports())
-        for p in ports:
-            # print(p)          # This causes each port's information to be printed out.
-            if "5740" in p[2]:
-                return (p[0])
-        return ('NULL')
-
-
-    def Lidar1Dist(evo):
-        while (1):
-            try:
-                distance = evo.readline()
-                if distance == "-Inf" or distance == "+Inf":
-                    print(distance)
-                else:
-                    try:
-                        distance = float(distance)
-                        # print(distance)
-                        return distance
-                    except Exception as e:
-                        print("[MainProcess/Lidar1Dist] : error converting to float", e)
-                        return None
-            except serial.SerialException as a:
-                print("[MainProcess/Lidar1Dist] : No Evo Lidar present... connect it and restart the application" + a)
-                return None
-
-
-    working_on_the_Pi = False
-    if working_on_the_Pi:
-        WHITE = LED(19)
-        RED_1 = LED(13)
-        GREEN = LED(16)
-        BLUE = LED(20)
-
-    stereo_Distance = 0.0
-    avg_measures = 10
-    lead_time = 3
-    # TRACKING LISTS
-    z_dist_deque = deque([])
-    measure_time_deque = deque([])
-
-    mega_data = mp.Queue()
-    future_dist_l = mp.Queue()
-    final_dist_l = mp.Queue()
-    stereo_data = mp.Queue()
-
-    kill_event=Event()
-    shutdown_event = Event()
-    # OPTIONS:
-    speed = 1
-    difficulty = 1
-    drillType = "Dynamic"
-    EvoLidar = False
-
-
-    guiData = data_object
-    guiData.speed = speed
-    guiData.difficulty = difficulty
-    guiData.drilltype = drillType
-
-    print("[MainProcess] : ")
-    print("Speed:  " + str(guiData.speed) + "  " + "Diff:  " + str(
-        guiData.difficulty) + "  " + "Drill:  " + guiData.drilltype)
-    print("_______________________________________________")
-
-    # ___ OPEN SERIAL PORT/S ___ #
-    if EvoLidar:
-        evo_data = False
-
-        while not evo_data and not shutdown_event.is_set() and not kill_event.is_set():
-            try:
-                port = findEvo()
-                evo = serial.Serial(port, baudrate=115200, timeout=2)
-                set_text = (0x00, 0x11, 0x01, 0x45)
-                evo.flushInput()
-                evo.write(set_text)
-                evo.flushOutput()
-                print("[MainProcess] : Connected to Evo (LIDAR1)")
-                evo_data = True
-            except serial.SerialException as e:
-                print("[MainProcess] : Cannot find Evo LIDAR1" + str(e))
-                time.sleep(2)
-                continue
-            except:
-                print("[MainProcess] : Cannot find Evo LIDAR1")
-                time.sleep(2)
-                continue
-
-    # START STEREO
-    try:
-        mp.Process(target=stereo.Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event]).start()
-
-        if working_on_the_Pi:
-            RED_1.on()
-
-    except Exception as e:
-        print('[MainProcess] : Stereo thread failed because of exception ' + str(e))
-
-    # START LAUNCHER
-    Launcher(guiData, mega_data, final_dist_l, future_dist_l, working_on_the_Pi, WHITE, kill_event)
-
-    while not shutdown_event.is_set() and not kill_event.is_set():
-        if drillType == "Dynamic":
-            if working_on_the_Pi:
-                if loop_count % 2 == 0:
-                    BLUE.on()
-                else:
-                    BLUE.off()
-
-            loop_count += 1
-            if loop_count == 100:
-                print("[MainProcess] : FUT_FINAL_DIST =   " + str(FUT_FINAL_DIST))
-                loop_count = 1
-
-            StartTime = time.time()
-            # Get(WAIT) for stereoDistance _____________________________
-            stereo = False
-            while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
-                try:
-                    tempData = stereo_data.get(timeout=1)
-                    stereo_Distance = float(tempData[2])
-                    stereo = True
-                except AttributeError as att:
-                    print("[MainProcess] : No data in stereoStack" + str(att))
-                    while not stereo and not kill_event.is_set():
-                        try:
-                            tempData = stereo_data.get(timeout=1)
-                            stereo_Distance = float(tempData[2])
-                            stereo_present = True
-                        except:
-                            # print("[MainProcess] : Waiting for Stereo...")
-                            sys.stdout.flush()
-                            time.sleep(0.1)
-                            continue
-
-                except Exception as q:
-                    print("[MainProcess] : No data in stereoStack" + str(q))
-                    while not stereo and not shutdown_event.is_set() and not kill_event.is_set():
-                        try:
-                            tempData = stereo_data.get(timeout=1)
-                            stereo_Distance = float(tempData[2])
-                            stereo_present = True
-                        except:
-                            print("[MainProcess] : Waiting for Stereo...")
-                            time.sleep(3)
-                            continue
-
-            print("[MainProcess] :  ", stereo_Distance)
-
-            if 1 <= stereo_Distance <= 35:  # Meters
-                rationaleDistMeasures = 1
-                distanceTotal = stereo_Distance
-
-                # Get(NO_WAIT) for Lidar_1_Dist _____________________________
-                if EvoLidar:
-                    try:
-                        LIDAR_1_Distance = Lidar1Dist(evo)
-                        evo.flushOutput()
-                        time.sleep(0.05)
-                        if LIDAR_1_Distance is not None and abs(
-                                stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-                            rationaleDistMeasures += 1
-                            distanceTotal += LIDAR_1_Distance
-                        #     lidar1Stack.push(LIDAR_1_Distance)
-                        # else:
-                        #     lidar1Stack.push(None)  # << None value indicates no GOOD new data
-
-                    except Exception as w:
-                        print("[MainProcess] : LIDAR_1 -> no data" + str(w))
-                        pass
-
-                # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
-                try:
-                    MEGA_DATA = mega_data.get_nowait()
-                    LIDAR_2_Distance = MEGA_DATA.lidar_2_Distance
-                    print("[MainProcess] : ", LIDAR_2_Distance)
-                    if LIDAR_2_Distance is not None and abs(
-                            stereo_Distance - LIDAR_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-                        rationaleDistMeasures += 1
-                        distanceTotal += LIDAR_2_Distance
-                except Exception as w:
-                    print("[MainProcess] : LIDAR_2 -> no data" + str(w))
-                    pass
-
-                PRE_FINAL_DIST = distanceTotal / rationaleDistMeasures
-
-                # MAKE SURE LAUNCHER THREAD OBTAINS SIMILAR VALUE:
-                # Launcher_FINAL_DIST = finalDistStack.peek()
-                # if newFinalDistLauncher_flag() = True
-                # Launcher_FINAL_DIST = finalDistStack.peek()
-                # if abs(Launcher_FINAL_DIST - PRE_FINAL_DIST) <= 2 # Meters
-                # Do everything
-                # else:
-                # print("[Main Thread] : Something is wrong with the data flow")
-
-                measure_time_deque.appendleft(time.time() - StartTime)
-                if measure_time_deque == avg_measures:
-                    measure_time_deque.pop()
-
-                if z_dist_deque == []:  # This is the first measurement
-                    z_dist_deque.appendleft(PRE_FINAL_DIST)
-                    # FUT_FINAL_DIST = None
-                elif len(z_dist_deque) < avg_measures:
-                    z_dist_deque.appendleft(PRE_FINAL_DIST)
-                    # FUT_FINAL_DIST = None
-                elif len(
-                        z_dist_deque) == avg_measures:  # Wait until we have 10 measurement before calculating players speed (if 5 FPS this means 2 sec)
-                    temp_dist = z_dist_deque[0] - z_dist_deque[avg_measures - 1]
-                    temp_time = sum([elem for elem in measure_time_deque])  # Time for avg_measure measurements
-
-                    playerspeed = temp_dist / temp_time  # meters/second
-                    # the idea is to stay ahead of the player by at least a second or two
-                    FUT_FINAL_DIST = PRE_FINAL_DIST + playerspeed * lead_time
-                    z_dist_deque.appendleft(PRE_FINAL_DIST)
-                    z_dist_deque.pop()
-
-                final_dist_l.put(PRE_FINAL_DIST)
-
-                future_dist_l.put(FUT_FINAL_DIST)
-
-
-
-            else:
-                print("[MainProcess] : Player is not in Range")
-                # Activate GPIO pin for notification LED
-                # ***Do something about this***
-                #
-                #
-                #
-                time.sleep(0.2)
-
-        elif drillType == "Static":
-            print("[MainProcess] : Main doesnt do much here")
-            time.sleep(1)
-
-        elif drillType == "Manual":
-            print("[MainProcess] : Main doesnt do much here")
-            time.sleep(1)
-        else:
-            print("[MainProcess] : no GUI data")
-            time.sleep(1)

@@ -166,7 +166,6 @@ SEND to STACKS:
         self.drillType = ""
         self.py_loop_count = 1
         self.endtime = None
-        # self.stereodata.masterval = 800
 
         self.pitchAngleTable = np.array([[5, 0],  # << Pitch angle lookup table based on estimations
                                      [7, 5],
@@ -179,6 +178,8 @@ SEND to STACKS:
                                      [21, 35],
                                      [23, 36],
                                      [25, 37]])
+
+# `FLASHIER PITCH TABLE FOR SHORT DISTANCES
 
 #        self.pitchAngleTable = np.array([[5, 15],  # << Pitch angle lookup table based on estimations
 #                                         [7, 16],
@@ -317,6 +318,11 @@ SEND to STACKS:
 
     def startup(self):
         while not self.startData and not self.kill_event.is_set(): # and not self.shutdown_event.is_set() and not self.kill_event.is_set():
+            if self.pause_event.is_set():
+                print("[Launcher] : Paused Drill")
+                while self.pause_event.is_set():
+                    time.sleep(1)
+
             try:
                 # Initialize Arduino UNO
                 uno_port = findUNO()
@@ -358,8 +364,9 @@ SEND to STACKS:
     def common_data(self):
         self.start_time = time.time()
         if self.pause_event.is_set():
-            time.sleep(0.5)
-            print("[PitchYaw] : Paused Drill")
+            print("[Launcher] : Paused Drill")
+            while self.pause_event.is_set():
+                time.sleep(1)
         #  print('[PitchYaw] : in common_data')
         gpio_blinker(self.color, self.py_loop_count, self.working_on_the_Pi)
         self.py_loop_count = loop_counter(self.py_loop_count)

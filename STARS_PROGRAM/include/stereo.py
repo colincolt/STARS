@@ -13,7 +13,7 @@ import sys
 # - capstone
 LOCATION = "capstone"
 
-working_on_the_Pi = True
+working_on_the_Pi = False
 if working_on_the_Pi:
     try:
         from gpiozero import LED
@@ -44,7 +44,7 @@ def loop_counter(loop_number):
 # _______PITCH AND YAW THREAD________ #
 
 
-def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera):
+def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pause_event):
     focalsize = 3.04e-03
     pixelsize = 1.12e-06
     baseline = 0.737
@@ -53,6 +53,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera):
     GREEN = led_color
     working_on_the_Pi = pi_no_pi
     kill_event = kill_event
+    pause_event = pause_event
     show_camera = show_camera
 
     TCP_IP = '169.254.116.12'
@@ -133,6 +134,10 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera):
     def connectClient():
         connected = False
         while not connected and not kill_event.is_set(): # and not shutdown_event.is_set() and not kill_event.is_set():  # Wait for client
+            if pause_event.is_set():
+                print("[Launcher] : Paused Drill")
+                while pause_event.is_set():
+                    time.sleep(1)
             try:
                 s.bind((TCP_IP, TCP_PORT))
                 s.listen(1)
@@ -160,6 +165,10 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera):
                 gpio_blinker(GREEN, stereo_loop_count)
 
             stereo_loop_count = loop_counter(stereo_loop_count)
+
+            if pause_event.is_set():
+                time.sleep(0.5)
+                print("[Stereo] : Paused Drill")
 
             try:
                 image = vs.read()
