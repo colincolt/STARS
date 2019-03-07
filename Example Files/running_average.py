@@ -5,12 +5,13 @@ import time
 max_measures = 5
 first_new = False
 right_xcoords = deque([1236, 1240, 1256, 1300, 1260])
-new_right_xcoord = 1600
+new_right_xcoord = 1460
+
 start_time = time.time()
 
 if len(right_xcoords) == max_measures:
     moving_avgs = np.convolve(right_xcoords, np.ones((3,))/3, mode='valid')
-    if abs(new_right_xcoord - moving_avgs[2])<= 100:
+    if abs(new_right_xcoord - moving_avgs[2])<= 200:
         right_xcoords.append(new_right_xcoord)
         old_right_xcoord = new_right_xcoord
         first_new = True
