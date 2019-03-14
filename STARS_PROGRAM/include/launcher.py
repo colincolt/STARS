@@ -82,10 +82,7 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main, kill_event):
                     tempData = "".join(megaData)
                     getdata = True
                     # IF SEND FLAG IS SET, DATA IS SENT AFTER:
-                    #print("before flag")
                     if send_flag.is_set():
-                        print("in if flag")
-
                         try:
                             data = send_data.pop()
                             # MEGA.reset_output_buffer()
@@ -207,6 +204,10 @@ SEND to STACKS:
         self.rationaleDistMeasures = 0
         self.distanceTotal = 0
         self.used_distance = 0.0
+        self.drill_data = data_object
+        self.targetTimes = [0.0,0.0,0.0,0.0,0.0]
+        self.ballSpeeds = [0.0,0.0,0.0,0.0,0.0]
+
 
         # LAUNCHER OPTIONS:
         self.WAIT_TIME = 0
@@ -254,17 +255,59 @@ SEND to STACKS:
                 self.MEGA_DATA = getMegaDataStack.peek()
                 self.voiceCommand = self.MEGA_DATA.voiceCommand
                 self.temperature = self.MEGA_DATA.temperature
-                print("VC = " + str(self.voiceCommand) + "  TEMP = " + str(self.temperature))
+                if self.temperature != 0.0:
+                    print("VC = " + str(self.voiceCommand) + "  TEMP = " + str(self.temperature))
+                    self.drill_data.temp = self.temperature
+                else:
+                    print("VC = " , str(self.voiceCommand))
                 time.sleep(0.5)
             except:
                 print("[Launcher] : Waiting for Voice Command")
                 time.sleep(1)
                 continue
-            
-            if self.pause_event.is_set():
-                print("[Launcher] : Paused Drill")
-                while self.pause_event.is_set():
-                    time.sleep(1)
+
+        # < ** HANDLE THE MEGA_DATA:
+        if self.targetTiming != 0:
+            print("[Launcher] : targetTiming = " + str(self.targetTiming))
+            self.drill_data.targetTime = self.targetTiming
+            for i in range[4]:
+                if self.drillCount == i:
+                    self.targetTimes[i] = self.drill_data.targetTime
+            self.targetTiming = 0  # < reset
+
+        if self.targetBallSpeed != 0:
+            print("[Launcher] : targetBallSpeed = " + str(self.targetBallSpeed))
+            self.drill_data.ballSpeed = self.targetBallSpeed
+            for i in range[4]:
+                if self.drillCount == i:
+                    self.ballSpeeds[i] = self.drill_data.ballSpeed
+            self.targetBallSpeed = 0  # < reset
+
+
+        # ___________________       Handle Voice input:     ______________________________________________ #
+
+        if self.voiceCommand > 0:
+            if self.voiceCommand == self.stopVC:
+                print("stop VC received")
+                self.kill_event.set()
+            elif self.voiceCommand == self.fasterVC:
+                print("faster VC received")
+                self.drillSpeed += 1
+            elif self.voiceCommand == self.slowerVC:
+                print("slower VC received")
+                self.drillSpeed -= 1
+            elif self.voiceCommand == self.pauseVC:
+                print("pause VC received")
+                self.pause_event.set()
+
+        if self.pause_event.is_set():
+            print("[Launcher] : Paused Drill")
+            while self.pause_event.is_set():
+                time.sleep(1)
+
+        elif self.kill_event.is_set():
+            print("[Launcher] :  Closing process")
+            sys.exit()
 
 
     def get_mega_data(self):
@@ -288,30 +331,35 @@ SEND to STACKS:
         # In DYNAMIC Mode, the motors spin up before receiving final instructions from MAIN THREAD
         # ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
         RPM = -1.13635244 * self.used_distance ** 2.0 + 97.7378699 * self.used_distance + 646.034298  # <-- Polynomial fit
-        motorSpeed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
-
+        RPS = RPM / 60
+        PERIOD = (1 / RPS)*(1000000)
+#        motorSpeed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
+        print("[Launcher]: RPM: ", RPM, "  Period: ", PERIOD)
         # ____SEND MEGA DATA STRING _____#    IF NO VALUE SEND AS '-
-
-        MotorSpeed = str(motorSpeed)
-        # ***Randomize targetChoice
-        targetChoice = int(random.choice([1, 2]))#, 3, 4]))
+        motor_period = str(int(PERIOD))
+        targetChoice = int(random.choice([2, 4]))
         # CALCULATE THE ESTIMATED TOF:
         estimated_tof = (0.120617 * self.used_distance)*1000  # + difficulty_time
         estimated_tof = round(estimated_tof,2)
-        #print(estimated_tof)
-        if self.first_drill and self.ballfeed =="0":
-            self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ','+ str(targetChoice) +',-1,' + self.ballfeed + ',' + str(estimated_tof) + '>'
-        else:
-            self.send_data = '<' + MotorSpeed + ',' + MotorSpeed + ',' + str(targetChoice) + ',' + str(
+        if self.first_drill:
+            print("Sending Target Initiation:")
+            self.send_data = '<' + motor_period + ',' + motor_period + ','+ str(targetChoice) +',-1,' + self.ballfeed + ',' + str(estimated_tof) + '>'
+            print(self.send_data)
+            send_mega_stack.push(self.send_data)
+            print("[Launcher] : BALL NUMBER :  ", self.drillCount)
+            self.send_flag.set()
+            while self.send_flag.is_set():
+                time.sleep(0.1)
+            time.sleep(2)
+        self.send_data = '<' + motor_period + ',' + motor_period + ',' + str(targetChoice) + ',' + str(
                 self.difficulty) + ',' + self.ballfeed + ',' + str(estimated_tof) + '>'
         # _____________________________________________________________________
 
         # ____________________ Write data to MEGA ____________________
         if (time.time() - self.startTime) <= 100:
-            print("[Launcher] : Sending launch data to stack and setting flag")
+#            print("[Launcher] : Sending launch data to stack and setting flag")
             send_mega_stack.push(self.send_data)
             print("[Launcher] : BALL NUMBER :  ", self.drillCount)
-            #time.sleep(0.2)
             self.send_flag.set()
             while self.send_flag.is_set():
                 
@@ -325,48 +373,7 @@ SEND to STACKS:
                 self.LaunchTime = time.time()
 
     def launch_motors(self):
-        # < ** HANDLE THE MEGA_DATA:
-        if self.targetTiming != 0:
-            #  print("[Launcher] : targetTiming = " + str(targetTiming))
-            print("[Launcher] : targetTiming = " + str(self.targetTiming))
-            #
-            #   DO SOMETHING WITH THIS
-            #
-            targetTiming = 0  # < reset
-
-        if self.targetBallSpeed != 0:
-            print("[Launcher] : targetBallSpeed = " + str(self.targetBallSpeed))
-            #
-            #   DO SOMETHING WITH THIS
-            #
-            targetBallSpeed = 0  # < reset
-
-        # ___________________       Handle Voice input:     ______________________________________________ #
-
-        if self.voiceCommand > 0:
-            if self.voiceCommand == self.stopVC:
-                self.kill_event.set()
-                sys.exit()
-            elif self.voiceCommand == self.fasterVC:
-                self.drillSpeed += 1
-            elif self.voiceCommand == self.slowerVC:
-                self.drillSpeed -= 1
-            elif self.voiceCommand == self.pauseVC:
-                self.wait_for_voice()
-
-        launch_data = False
-        while not launch_data and not self.kill_event.is_set():
-            try:
-                FINAL_DIST = self.get_final_dist.get(timeout=2)  # <<<<< GET PREDICTED LOCATION
-                print("[Launcher] :  Final Dist : " + str(FINAL_DIST))
-            except:
-                print("[Launcher] : Waiting for final distance")
-                time.sleep(2)
-                continue
-            else:
-                self.used_distance = FINAL_DIST
-                launch_data = True
-                self.send_launch_data()
+        self.send_launch_data()
 
     def launcher_startup(self):
         startData = False
@@ -374,6 +381,9 @@ SEND to STACKS:
             self.drillSpeed = self.gui_data.speed
             self.difficulty = self.gui_data.difficulty
             self.drillType = self.gui_data.drilltype
+
+            self.orig_speed = self.drillSpeed
+            self.orig_diff = self.difficulty
 
             if self.pause_event.is_set():
                 print("[Launcher] : Paused Drill")
@@ -430,6 +440,19 @@ SEND to STACKS:
                 time.sleep(1)
 
         self.drill_wait_time()
+        
+        launch_data = False
+        while not launch_data and not self.kill_event.is_set():
+            try:
+                FINAL_DIST = self.get_final_dist.get(timeout=2)  # <<<<<
+#                print("[Launcher] :  Final Dist : " + str(FINAL_DIST))
+            except:
+                print("[Launcher] : Waiting for final distance")
+                time.sleep(2)
+                continue
+            else:
+                self.used_distance = FINAL_DIST
+                launch_data = True
 
     def dynamic_drill(self):
         self.WAIT_TIME = self.DYNAMIC_WAIT_TIME
@@ -438,8 +461,6 @@ SEND to STACKS:
         # ___________________ HOLD THE LAUNCHER SEQUENCE FOR 3-4 SECONDS: ___________________
         while self.drillCount <= 5 and not self.kill_event.is_set(): #and not self.shutdown_event.is_set() and not self.kill_event.is_set():
             self.launcher_common()
-
-            # self.get_stereodata()
 
             try:
                 self.get_mega_data()
@@ -452,9 +473,9 @@ SEND to STACKS:
                 time.sleep(1)
                 continue
             else:
-                self.ballfeed = "0"
-
-                self.launch_motors()
+#                self.ballfeed = "0"
+#
+#                self.launch_motors()
 
                 # _____ GET FUT_FINAL_DIST (No Wait)
                 if self.OLD_FUT_FINAL_DIST is not None:
@@ -463,13 +484,13 @@ SEND to STACKS:
                 try:
                     
                     self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 1)  # <<<<< GET PREDICTED LOCATION
-                    #print(FUT_FINAL_DIST)
+                    print("FUT_FINAL_DIST:  ",self.FUT_FINAL_DIST)
                 except:
                     print("[Launcher] : Failed to get FUT FINAL DIST")
                     self.FUT_FINAL_DIST = None
                     pass
                 finally:
-                    print("[Launcher] : in the finally")
+#                    print("[Launcher] : in the finally")
                     if not self.FUT_FINAL_DIST or self.FUT_FINAL_DIST == self.OLD_FUT_FINAL_DIST:  # <- no prediction is done in this thread so it will send AS IS
                         print("[Launcher] : Sending launch data as is")
                         self.ballfeed = "1"
@@ -515,8 +536,6 @@ SEND to STACKS:
         while self.drillCount <= 5 and not self.kill_event.is_set(): # and not self.shutdown_event.is_set() and not self.kill_event.is_set():
             self.launcher_common()
 
-            # self.get_stereodata()
-
             try:
                 self.get_mega_data()
             except:
@@ -557,7 +576,20 @@ SEND to STACKS:
                 self.launch_motors()
 
         if self.drillCount == 5:
+
             print("[Launcher] : Drill COMPLETE!")
+            print("===================================")
+            print("   Drill Summary   ")
+            print("Results for ", self.drillType, " passing drill:")
+            print("User selcted a Difficulty: ", self.difficulty, " and a Speed: ",self.drillSpeed)
+            print("Ball #               :        one    two    three    four    five    ")
+            print("Player reaction time :        ",self.targetTimes[0],"    ",self.targetTimes[1],"    ",self.targetTimes[2],"    ",self.targetTimes[3],"    ",self.targetTimes[4],"    ")
+            print("Player passing speed :        ",self.ballSpeeds[0],"    ",self.ballSpeeds[1],"    ",self.ballSpeeds[2],"    ",self.ballSpeeds[3],"    ",self.ballSpeeds[4],"    ")
+            try:
+                print("At a current temperature of :        ",self.drill_data.temp)
+            except:
+                pass
+            sys.exit()
 
         elif self.kill_event.is_set():
             print("[Launcher] :  Closing process")

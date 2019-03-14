@@ -25,12 +25,15 @@ def return_data(distance):
                              [23, 36],
                              [25, 37]])
 
-    RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-    motor_speed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
+    RPM = -1.14 * used_distance ** 2.0 + 98.0 * used_distance + 646.0  # <-- Polynomial fit
+    RPS = RPM / 60
+    PERIOD = (1 / RPS)*(1000000)
+    #motor_speed = RPM
+    #motor_speed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
     targetChoice = int(random.choice([1, 2 , 3, 4]))
     estimated_tof = (0.120617 * used_distance) * 1000  # + difficulty_time
     estimated_tof = round(estimated_tof, 2)
-    motor_speed = str(motor_speed)
+    motor_speed = str(int(PERIOD))
     #
     mega_data = '<' + motor_speed + ',' + motor_speed + ',' + str(targetChoice) + ',' + str(
         difficulty) + ',' + ballfeed + ',' + str(estimated_tof) + '>'
@@ -57,16 +60,18 @@ def findMEGA():
     return ('NULL')
 
 def findUNO():
+    print("finding uno")
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
-        # print(p)           # This causes each port's information to be printed out.
+        print(p)           # This causes each port's information to be printed out.
         if "0043" in p[2]:
             return (p[0])
     return ('NULL')
 
 
-def get_mega():
+def get_mega(close_event):
     mega_port = findMEGA()
+    print("in mega")
 
     try:
         MEGA = serial.Serial(mega_port, 115200, timeout=1)
@@ -74,36 +79,58 @@ def get_mega():
     except FileNotFoundError as e:
         print("findMEGA returned 'NULL' looking for Arduino Mega")
     except serial.SerialException as ex:
-        pass
+        print("findMEGA returned 'NULL' looking for Arduino Mega")
+
     else:
-        MEGA.baudrate = 115200
-        send_data = "<0,0,1,-1,0,0>"
-        wait_for_data(MEGA)
-        MEGA.write(send_data.encode())
-        return MEGA
-    
+        try:
+            MEGA.baudrate = 115200
+            send_data = "<0,0,1,-1,0,0>"
+            wait_for_data(MEGA, close_event)
+            print(send_data)
+            MEGA.write(send_data.encode())
+            return MEGA
+        except:
+            close_event.set()
+
 def get_uno():
+    print("getting UNO")
     uno_port = findUNO()
 
     try:
         UNO = serial.Serial(uno_port, 115200, timeout=1)  # change ACM number as found from "ls /dev/tty*"
 
     except FileNotFoundError as e:
-        print("findMEGA returned 'NULL' looking for Arduino Mega")
+        print("findUNO returned 'NULL' looking for Arduino Mega")
     except serial.SerialException as ex:
         pass
     else:
         UNO.baudrate = 115200
         return UNO
 
-def wait_for_data(MEGA):
+def wait_for_data(MEGA, close_event):
     getdata = False
-    while not getdata:
+    timeout = False
+    while not getdata and not close_event.is_set():
+        
         if MEGA.is_open:
             try:
+                print("in the try")
                 startMarker = MEGA.read().decode()
+
+                if startMarker == None:
+                    print("start = None")
+                    sys.exit()
+                if startMarker == "":
+                    print(startMarker)
+                    print("exiting")
+                    sys.exit()
+
+
             except Exception as e:
                 print('[MegaDataThread] : ERROR: ' + str(e))
+            except Exception as e:
+                print("not receiving anything",e)
+                timeout = True
             else:
                 if startMarker == "<":
                     megaDataStr = MEGA.read(25)  # READ DATA FORMATTED AS ('< 1 2 3 4 5 >')
@@ -116,7 +143,7 @@ def wait_for_data(MEGA):
                     tempData = tempData.split(",")
                     print("[MegaData] : Tempdata=  " , tempData)
 
-                    getdata = False
+                    getdata = True
         else:
             print("lost Mega")
 
@@ -126,24 +153,33 @@ def launch(MEGA, UNO, Mega_data, Uno_data,close_launch):
     Mega_data = Mega_data.strip(">")
     Mega_data = Mega_data.split(",")
     motor_speed = str(Mega_data[0])
-    targetChoice = str(Mega_data[1])
-    estimated_tof = str(Mega_data[2])
+    targetChoice = str(Mega_data[2])
+    estimated_tof = str(Mega_data[3])
 
-    send_start = '<' + motor_speed + ',' + motor_speed + ',' + targetChoice + ',-1,0,' + estimated_tof + '>'
+    difficulty = "2"
+    ballFeed = "1"
+    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + '>'
 
-    print("Launch Data:  ",Mega_data,"  ",Uno_data)
-
-    UNO.write(Uno_data.encode())
-
-    wait_for_data(MEGA)
-    MEGA.write(send_start.encode())
+    time.sleep(3)
+    UNO.write(str(Uno_data).encode())
+    print("Uno Data:  ",Uno_data)
+    #unoDat = UNO.read(10).decode()
+    #print("UNO Response", unoDat)
+    
+#    wait_for_data(MEGA)
+#    MEGA.write(send_start.encode())
+#    print("StarData: ", send_start)
     print("Starting motors")
     time.sleep(3)
-    wait_for_data(MEGA)
+    wait_for_data(MEGA, close_launch)
+    Mega_data = send_data
     MEGA.write(Mega_data.encode())
+    print("Mega Data: ", Mega_data)
     print("launching ball")
-    while True:
-        wait_for_data(MEGA)
+    loop_count = 0
+    while loop_count <= 5:
+        loop_count += 1
+        wait_for_data(MEGA, close_launch)
         if close_launch.is_set():
             sys.exit()
 
@@ -153,7 +189,13 @@ def run(motor_data, close_launch):
     Uno_data=motor_data[1]
     print(Mega_data)
     print(Uno_data)
-    MEGA = get_mega()
+    MEGA = get_mega(close_launch)
+    if close_launch.is_set():
+        exit()
+    print("got mega")
+    print("getting uno 1")
     UNO = get_uno()
+    print("got uno")
 
     launch(MEGA, UNO, Mega_data, Uno_data, close_launch)
+    print("sent to launch")

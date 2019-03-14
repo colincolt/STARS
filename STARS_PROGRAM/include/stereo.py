@@ -42,14 +42,15 @@ def loop_counter(loop_number):
 
 
 def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pause_event):
-    focalsize = 3.04e-03
-    pixelsize = 1.12e-06
-    baseline = 0.737
+    # focalsize = 3.04e-03
+    # pixelsize = 1.12e-06
+    # baseline = 0.737
     
     stereo_data = stereo_data
     GREEN = led_color
     working_on_the_Pi = pi_no_pi
     kill_event = kill_event
+    pause_event =pause_event
     show_camera = show_camera
 
     TCP_IP = '169.254.116.12'
@@ -58,7 +59,6 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("-v", "--video", help="path to the (optional) video file")
     ap.add_argument("-b", "--buffer", type=int, default=8, help="max buffer size")
     args = vars(ap.parse_args())
 
@@ -78,11 +78,10 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
         jerseyUpper = (170, 255, 255)
         
     pts = deque(maxlen=args["buffer"])
-    frame_width = 640
-    frame_height = 448
+    frame_width = 1008
+    frame_height = 256
     framerate = 20
     resolution = (frame_width, frame_height)
-    stereo_loop_count = 1
     print("[Stereo] : trying to connected")
     sys.stdout.flush()
 
@@ -92,38 +91,25 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     def receive_data():
         try:
             data = clientPort.recv(BUFFER_SIZE)
-            clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
+            #clientPort.send(data)  # SEND DATA BACK (COULD BE USED FOR STOP COMMAND)
             right_xcoord = data.decode()
             return right_xcoord
         except socket.error:
             print("[Stereo] : missed client data")
-            while not kill_event.is_set():  # and not shutdown_event.is_set() and not kill_event.is_set():
-                try:
-                    data = clientPort.recv(BUFFER_SIZE)
-                    clientPort.send(data)
-                    right_xcoord = data.decode()
-                    return right_xcoord
-                except socket.error:
-                    print("[Stereo] : Lost the client connection")
-                    time.sleep(0.5)
-                    continue
+
 
     def sendto_queue(left_xcoord,right_xcoord, start_time):
-        disparity = abs(left_xcoord - right_xcoord)
-        distance = round((focalsize * baseline) / (disparity * pixelsize),2)
-        
-#        distance_list.appendleft(distance)
-#        if len(distance_list) == max_measures:
-#            moving_avg = sum(distance_list) / max_measures
-#            if distance_list[0] - moving_avg <= 100:
-#                distance_list.pop()
-#            else:
-#                distance_list.popleft()
-        # SENDS DATA TO Class, which can be pushed using Stacks's______________________________
-        data = str(right_xcoord), ",", str(left_xcoord), ",", str(distance)
-        stereo_data.put(data)
-        fps = time.time() - start_time
-        #print("[Stereo] :   FPS =   ", distance)
+        # disparity = abs(left_xcoord - right_xcoord)
+        # if disparity == 0:
+        #     disparity = 1
+        # distance = round((focalsize * baseline) / (disparity * pixelsize),2)
+        if not pause_event.is_set():
+            data = str(right_xcoord), ",", str(left_xcoord)  #, ",", str(distance)
+            stereo_data.put(data)
+        # fps = time.time() - start_time
+
+        # PixelDisp=(3280 - left_xcoord - right_xcoord)
+        # print("Left: ", left_xcoord, " Right: ", right_xcoord," Dist: ", distance, " Disparity: ", disparity)
 
     def connectClient():
         connected = False
@@ -144,11 +130,14 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                 print('[Stereo] :       No Client' + str(e))
                 sys.stdout.flush()
                 time.sleep(3)
-                continue
-#        sys.exit()
 
-    def ProcessLoop():  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution):
+
+        if kill_event.is_set():
+            sys.exit()
+
+    def ProcessLoop(kill_event):  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution):
         stereo_loop_count = 1
+        kill_event = kill_event
         while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
             if pause_event.is_set():
                 print("[MainProcess] : PAUSE BUTTON PRESSED")
@@ -161,26 +150,9 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
 
             stereo_loop_count = loop_counter(stereo_loop_count)
 
-            try:
-                image = vs.read()
-                image = imutils.resize(image, width=frame_width, height=frame_height)
-            except AttributeError as e:
-                print("[Stereo.ProcessLoop] : no image")
-                capture = False
-                while not capture and not kill_event.is_set(): # and not shutdown_event.is_set() and not kill_event.is_set():
-                    image = vs.read()
-                    image = imutils.resize(image, width=frame_width, height=frame_height)
-                    try:
-                        image = vs.read()
-                        image = imutils.resize(image, width=frame_width, height=frame_height)
-                        capture = True
-                    except AttributeError as e:
-                        print("[Stereo.ProcessLoop] : no image")
-                        capture = False
-                        continue
-                    except:
-                        PiVideoStream().stop()
-                        # shutdown_event.set()
+            image = vs.read()
+            image = imutils.resize(image, width=frame_width)
+
 
             blurred = cv2.GaussianBlur(image, (11, 11), 0)
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
@@ -205,7 +177,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                 M = cv2.moments(c)
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
                 centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
-                centroid = (centroid[0] * 2464 / frame_width, centroid[1] * 2464 / frame_width)
+                centroid = (centroid[0] * 3280 / frame_width, centroid[1] * 2464 / frame_height)
 
                 if show_camera.is_set():
                     ((x, y), radius) = cv2.minEnclosingCircle(c)
@@ -215,22 +187,27 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                         cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
                         cv2.circle(image, center, 5, (0, 0, 255), -1)
 
-                    cv2.imshow("Frame", mask)  #  mask
+                    cv2.imshow("Frame", image)  #  mask
                     key = cv2.waitKey(1) & 0xFF
 
                 right_xcoords = receive_data()
-                right_xcoords = right_xcoords.split('>')
-                right_xcoord = right_xcoords[0]
+                right_xcoords = right_xcoords.split('<')
+                right_xcoord = right_xcoords[1]
+                #print(right_xcoord)
                 fps = time.time() - start_time
-                print("FPS =  ",fps,"  right x coord:  ",right_xcoord)
 
                 try:
-                    right_xcoord = float(right_xcoord)
+                    right_xcoord = int(right_xcoord)
                     left_xcoord = int(centroid[0])
                     sendto_queue(left_xcoord,right_xcoord,start_time)
+#                    print("left x:  ",left_xcoord, "  right x:  ", right_xcoord)
+#                    disparity = abs(left_xcoord-right_xcoord)
+#                    distance = (focalsize*baseline)/(disparity*pixelsize)
+#                    print("distance: ", distance)
+
                 except ValueError as val:
-                    print("Value Error:  ->  ",val)
-        
+                    # print("Value Error:  ->  ",val)
+                    pass
 
         if kill_event.is_set():
             print("[Stereo] : closing socket connection")
@@ -242,7 +219,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
 
 
     class PiVideoStream:
-        def __init__(self):  # , resolution = (800, 608), framerate = 32):
+        def __init__(self, kill_event):  # , resolution = (800, 608), framerate = 32):
             # initialize the camera and stream
             self.camera = PiCamera()
             self.camera.resolution = resolution
@@ -250,9 +227,9 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
             self.rawCapture = PiRGBArray(self.camera, size=resolution)
             self.stream = self.camera.capture_continuous(self.rawCapture, format="bgr", use_video_port=True)
             # initialize the frame and the variable used to indicate
-            # if the thread should be stopped
             self.frame = None
             self.stopped = False
+            self.kill_event = kill_event
             time.sleep(1)
 
         def start(self):
@@ -268,7 +245,8 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                     # preparation for the next frame
                     self.frame = f.array
                     self.rawCapture.truncate(0)
-
+                    if self.kill_event.is_set():
+                        self.stopped = True
                     if self.stopped:
                         print('[PiVideoStream] : Closing Camera...')
                         self.stream.close()
@@ -288,11 +266,17 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     print("[Stereo] starting THREADED frames from `picamera` module...")
     sys.stdout.flush()
     clientPort = connectClient()
-    vs = PiVideoStream().start()
-    print("[Stereo] : Initializing camera")
-    sys.stdout.flush()
-    time.sleep(2.0)  # < Let Video Thread startup
-    ProcessLoop()  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution)
+    try:
+        vs = PiVideoStream(kill_event).start()
+    except NameError as n:
+        print(n)
+    except Exception as e:
+        print(e)
+    else:
+        print("[Stereo] : Initializing camera")
+        sys.stdout.flush()
+        time.sleep(2.0)  # < Let Video Thread startup
+        ProcessLoop(kill_event)  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution)
 
 
 if __name__ == "__main__":

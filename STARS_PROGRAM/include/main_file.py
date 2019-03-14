@@ -14,10 +14,9 @@ STACKS:
 <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
 <     https://www.pythoncentral.io/stack-tutorial-python-implementation/  '''
 
-working_on_the_Pi = True
+working_on_the_Pi = False
 
 # Packages
-# import include.stereo as stereo
 import include.launcher as launcher
 import include.pitch_yaw as pitch_yaw
 try:
@@ -92,8 +91,6 @@ else:
     BLUE = 20
     WHITE = 19
 
-# GLOBAL FLAGS/EVENTS:
-
 # GLOBAL VARIABLES:
 startMarker = '<'
 
@@ -109,51 +106,45 @@ def loop_counter(loop_number):
     if loop_number >= 10:
         loop_number = 1
     return loop_number
-# _______PITCH AND YAW THREAD________ #
-
 
 
 def findEvo():
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
-        # print(p)          # This causes each port's information to be printed out.
         if "5740" in p[2]:
             return (p[0])
     return ('NULL')
-
-
 
 def Lidar1Dist(evo):
     while (1):
         try:
             distance = evo.readline()
             if distance == "-Inf" or distance == "+Inf":
-                print(distance)
+                print("[MainProcess-Evo]: Out of Range")
             else:
                 try:
                     distance = float(distance)
-                    # print(distance)
+                    # print([]distance)
                     return distance
                 except Exception as e:
-                    print("[MainProcess/Lidar1Dist] : error converting to float", e)
+                    print("[MainProcess-Evo] : error converting to float", e)
                     return None
         except serial.SerialException as a:
-            print("[MainProcess/Lidar1Dist] : No Evo Lidar present... connect it and restart the application" + a)
+            print("[MainProcess-Evo] : No Evo Lidar present... connect it and restart the application" + a)
             return None
 
 
 # startMainFile STACK IO
 # RECEIVE from STACKS:
-#   stereoStack
-#
+#   stereoQueue
+#   megaDataQueue
 # SEND to STACKS:
+#   finalDistStack
 #   futureDistStack
 #
 #
 
-
-
-def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYawStart, LauncherStart, EvoStart, show_camera):  # , args): ## NOT A THREAD, performs the bulk of calculation
+def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYawStart, LauncherStart, EvoStart, show_camera): 
     # # _______________________________Main Processing_____________________________________
     # PACKAGES:
     import include.stereo as stereo
@@ -175,11 +166,7 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
     final_dist_l = mp.Queue()
     future_dist_py = mp.Queue()
     final_dist_py = mp.Queue()
-    # KILL = mp.Event()
-    # kill_queue = mp.Queue()
-    # kill_pitchyaw = mp.Queue()
-    # kill_stereo = mp.Queue()
-
+    data_flag = mp.Event()
     processes = []
 
 
@@ -196,6 +183,7 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
     kill_event = kill_event
     pause_event = pause_event
     py_reset_event = mp.Event()
+    pymain_stereo_flag = mp.Event()
     stereo_Distance = 0.0
     loop_count = 1
 
@@ -216,10 +204,10 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
         while not stereo and not kill_event.is_set():
             if pause_event.is_set():
                 print("[MainProcess] : PAUSE BUTTON PRESSED")
-                # DO something about processes
                 while pause_event.is_set():
                     time.sleep(1)
             try:
+                pymain_stereo_flag.set()
                 tempData = stereo_py_main.get(timeout=0.1)
                 stereo_Distance = float(tempData[2])
                 stereo = True
@@ -244,39 +232,45 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
                             LIDAR_1_Distance = Lidar1Dist(evo)
                             evo.flushOutput()
                             time.sleep(0.05)
-                            if LIDAR_1_Distance is not None and abs(
-                                    stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                            if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                                print("[MainProcess] Evo : ", LIDAR_1_Distance, " meters")
                                 rationaleDistMeasures += 1
                                 distanceTotal += LIDAR_1_Distance
-                            #     lidar1Stack.push(LIDAR_1_Distance)
-                            # else:
-                            #     lidar1Stack.push(None)  # << None value indicates no GOOD new data
-
                         except Exception as w:
                             # print("[MainProcess] : LIDAR_1 -> no data" + str(w))
                             pass
 
-                    # Get(NO_WAIT)for Lidar_2_Dist (Run on New Data EVENT() trigger?)  _____________________________
+                    # Get(NO_WAIT)for MEGA_DATA (Run on New Data EVENT() trigger?)  _____________________________
                     try:
                         MEGA_DATA = mega_data.get_nowait()
-                        LIDAR_2_Distance = MEGA_DATA.lidar_2_Distance
-                        # print("[MainProcess] : ", LIDAR_2_Distance)
-                        if LIDAR_2_Distance is not None and abs(
-                                stereo_Distance - LIDAR_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                        tempData = tempData.strip("<")
+                        tempData = tempData.strip(">")
+                        tempData = tempData.split(",")
+                        #print("[MainFile] : Tempdata=  " + str(tempData))
+
+                        lidar_2_Distance = int(tempData[0])  # lidarDistance = int(cm)
+#                        temperature = int(tempData[1])  # temperature = int()
+#                        voiceCommand = int(tempData[2])  # voice commands = int(from 1 to 5)
+#                        targetTiming = int(tempData[3])  # targetTiming = float(0.0)
+#                        targetBallSpeed = float(tempData[4])  # targetBallSpeed
+
+                        print("[MainProcess] Garmin : ", lidar_2_Distance, " meters")
+                        if lidar_2_Distance is not None and abs(
+                                stereo_Distance - lidar_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
                             rationaleDistMeasures += 1
-                            distanceTotal += LIDAR_2_Distance
+                            distanceTotal += lidar_2_Distance
                     except Exception as w:
                         # print("[MainProcess] : LIDAR_2 -> no data" + str(w))
                         pass
-
                     FINAL_DIST = distanceTotal / rationaleDistMeasures
                     return FINAL_DIST
+                
         if kill_event.is_set():
             print("[MainProcess] : EXIT BUTTON PRESSED")
             py_reset_event.set()
-            while py_reset_event.is_set():
+            while py_reset_event.is_set() and processes[1].is_alive():
                 time.sleep(0.5)
-                print("[MainFile] : waiting for yaw motor reset")
+                print("[MainFile] : waiting for yaw motor reset 1")
             
             for p in processes:
                 if working_on_the_Pi:
@@ -286,7 +280,8 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
                 time.sleep(1)
                 p.terminate()
                 p.join()
-                print("[MainProcess] :  ", p)
+                #print("[MainProcess] :  ", p)
+            print("[MainProcess] :  Closing...")
             sys.exit()
 
 
@@ -313,16 +308,16 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
                 time.sleep(2)
                 continue
 
-    # _______________________ Start Threads _______________________--_ #
-
-
+    # _______________________ Start Threads ________________________ #
     print("Starting Threads")
 
     if import_error:
         print("[MainProcess] : STERESCOPICS NOT STARTING")
     else:
         try:
-            processes.append(mp.Process(target=stereo.Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event, show_camera,pause_event]))
+            Stereo = mp.Process(target=stereo.Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event, show_camera, pause_event])#data_flag])
+            Stereo.daemon = True
+            processes.append(Stereo) # working_on_the_Pi, GREEN, kill_event, show_camera, pause_event]))
 
             if working_on_the_Pi:
                 RED_1.on()
@@ -332,7 +327,9 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
 
     if StartPitchYaw:
         try:
-            processes.append(pitch_yaw.PitchYaw(guiData, stereo_data, stereo_py_main, final_dist_py, future_dist_py,  working_on_the_Pi, YELLOW, kill_event, py_reset_event, pause_event))
+            PitchYaw = pitch_yaw.PitchYaw(guiData, stereo_data, stereo_py_main, final_dist_py, future_dist_py,  working_on_the_Pi, YELLOW, kill_event, py_reset_event, pause_event,data_flag, pymain_stereo_flag)
+
+            processes.append(PitchYaw)
             
             if working_on_the_Pi:
                 RED_2.on()
@@ -344,7 +341,8 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
 
     if StartLauncher:
         try:
-            processes.append(launcher.Launcher(guiData, mega_data, final_dist_l, future_dist_l, working_on_the_Pi, WHITE, kill_event,pause_event))
+            Launch = launcher.Launcher(guiData, mega_data, final_dist_l, future_dist_l, working_on_the_Pi, WHITE, kill_event,pause_event)
+            processes.append(Launch)
 
             if working_on_the_Pi:
                 RED_3.on()
@@ -357,11 +355,10 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
 
     try:
         for p in processes:
+            p.daemon = True
             p.start()
     except:
         print("{MainFile} : Issue starting threads")
-
-
     # if shutdown_event.is_set():
     #     print("[MainProcess] : STOP BUTTON PRESSED")
     #     print("[MainProcess] : STOP BUTTON PRESSED")
@@ -385,6 +382,7 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
             p.terminate()
             p.join()
             print("[MainProcess] :  ", p)
+        print("[MainProcess]: Closing MainFile")
         sys.exit()
 
     # ___________ "MAIN THREAD" LOOP __________ #
@@ -491,19 +489,23 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
     if kill_event.is_set():
         print("[MainProcess] : EXIT BUTTON PRESSED")
         py_reset_event.set()
-        while py_reset_event.is_set():
+        while py_reset_event.is_set() and processes[1].is_alive():
             time.sleep(0.5)
-            print("[MainFile] : waiting for yaw motor reset")
-        
+            print("[MainFile] : waiting for yaw motor reset 2")
+
         for p in processes:
-            if working_on_the_Pi:
-                RED_1.off()
-                RED_2.off()
-                RED_3.off()
             time.sleep(1)
             p.terminate()
             p.join()
             print("[MainProcess] :  ", p)
+
+        if working_on_the_Pi:
+            RED_1.off()
+            RED_2.off()
+            RED_3.off()
+            
+        print("[MainProcess]: Closing MainFile")
+
         sys.exit()
     else:
         print("[MainProcess] : Not sure what went wrong")
