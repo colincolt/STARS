@@ -13,7 +13,6 @@ show_camera.set()
 try:
     import cv2
     import imutils
-    import io
     import time
     from picamera.array import PiRGBArray
     from picamera import PiCamera
@@ -38,8 +37,8 @@ HOST = '169.254.116.12'  # Define the IP address for communication
 PORT = 5025
 BUFFER_SIZE = 128
 serverPi = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-frame_width = 640
-frame_height = 448
+frame_width = 1008
+frame_height = 256
 resolution = (frame_width, frame_height)
 
 ap = argparse.ArgumentParser()
@@ -118,16 +117,16 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
                 M = cv2.moments(c)
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
                 centroid = (round((M["m10"] / M["m00"]), 3), round((M["m01"] / M["m00"]), 3))
-                centroid = (centroid[0] * 2464 / frame_width, centroid[1] * 2464 / frame_height)
+                centroid = (centroid[0] * 3280 / frame_width, centroid[1] * 2464 / frame_height)
 
-                value = str(int(centroid[0]))+'>'
-                # print("X-coordinate: " + value)
+                value = '<'+str(int(centroid[0]))
+                print("X-coordinate: " + value)
                 if show_camera.isSet():
                     ((x, y), radius) = cv2.minEnclosingCircle(c)
                     if radius > 0.5:
                         cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
                         cv2.circle(image, center, 5, (0, 0, 255), -1)
-                    cv2.imshow("Frame", mask)  #  mask
+                    cv2.imshow("Frame", image)  #  mask
                     key = cv2.waitKey(1) & 0xFF
 
                 # Send Data and Sockets Reconnection loop
@@ -149,8 +148,8 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
                         except Exception as e:
                             print("Some exception:  ", e)  # try:
 
-                FPS = time.time() - start_time
-                print("FPS: " + str(FPS))
+                #FPS = time.time() - start_time
+                #print("FPS: " + str(FPS))
 
             else:
                 print("[StereoClient] : didnt detect anything pink")

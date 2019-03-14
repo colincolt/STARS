@@ -1,7 +1,7 @@
 from guizero import App, Text, PushButton, Window, Slider, Picture, TextBox
 import include.main_file as main
 import include.launch_test as test
-import include.stereo as stereo
+#import include.stereo_pool as stereo
 from threading import Thread
 import multiprocessing as mp
 import sys
@@ -33,6 +33,8 @@ class gui_app():
     def START(self, ballSpeed, difficulty, drillType):
         if pause_event.is_set():
             pause_event.clear()
+        if kill_event.is_set():
+            kill_event.clear()
         else:
             def StartProgram(ballSpeed, difficulty, drillType):
                 main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera)
@@ -62,16 +64,14 @@ class gui_app():
         try:
             if self.startThread.isAlive():
                 kill_event.set()
-                time.sleep(10)
-                print("[GUI] : EXITING...")
+                time.sleep(1)
+                print("[GUI] : Closing Drill Window...")
                 thread_not_joined = False
                 while thread_not_joined:
                     try:
                         self.startThread.join()
-                        print("[GUI] : in try")
                         thread_not_joined = True
                     except:
-                        print("[GUI] : in except")
                         continue
 
         except:
@@ -112,6 +112,11 @@ class gui_app():
         # print("This is the START command")
 
     def app_exit(self,app):
+        print("")
+        print("----------------------------")
+        print("Application Closing...")
+        print("----------------------------")
+
         try:
             if self.startThread.isAlive():
                 self.exit_command(app)
@@ -119,11 +124,19 @@ class gui_app():
             sys.exit()
 
     def send_data(self):
-        run_launch = test.run(self.motor_data, close_launch)
+        def Start_Launch(motor_data, close_launch):
+            test.run(motor_data, close_launch)
+
+        self.StartL = Thread(target=Start_Launch(self.motor_data, close_launch))
+        self.StartL.start()
 
     def close_test(self, window):
         close_launch.set()
-        window.hide()
+        try:
+            self.StartL.join()
+            window.hide()
+        except:
+            window.hide()
         # sys.exit()
 
     def show_cam(self):
