@@ -14,7 +14,7 @@ STACKS:
 <     https://interactivepython.org/runestone/static/pythonds/BasicDS/ImplementingaStackinPython.html       >
 <     https://www.pythoncentral.io/stack-tutorial-python-implementation/  '''
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 # Packages
 import include.launcher as launcher
@@ -153,6 +153,9 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
     stereo_Distance = 0.0
     avg_measures = 10
     lead_time = 3
+    focalsize = 3.04e-03
+    pixelsize = 1.12e-06
+    baseline = 0.737
     # TRACKING LISTS
     z_dist_deque = deque([])
     measure_time_deque = deque([])
@@ -208,15 +211,22 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
                     time.sleep(1)
             try:
                 pymain_stereo_flag.set()
-                tempData = stereo_py_main.get(timeout=0.1)
-                stereo_Distance = float(tempData[2])
+                # print("Main: flag is set")
+                tempData = stereo_py_main.get(timeout=0.2)
+                RightXcoord = int(float(tempData[0]))  
+                LeftXcoord = int(float(tempData[1]))
+                disparity = abs(LeftXcoord - RightXcoord)
+                if disparity == 0:
+                    disparity = 1
+                stereo_Distance = round((focalsize * baseline) / (disparity * pixelsize), 2)
+                #print("[MainProcess] : Distance =  ", stereo_Distance)
                 stereo = True
             except AttributeError as att:
-                # print("[MainProcess] : No data in stereoStack" + str(att))
+                #print("[MainProcess] : No data in stereoStack" + str(att))
                 pass
 
             except Exception as q:
-                # print("[MainProcess] : No data in stereoStack" + str(q))
+                #print("[MainProcess] : No data in stereoStack" + str(q))
                 pass
             else:
                 try:
@@ -262,7 +272,7 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
                     except Exception as w:
                         # print("[MainProcess] : LIDAR_2 -> no data" + str(w))
                         pass
-                    FINAL_DIST = distanceTotal / rationaleDistMeasures
+                    FINAL_DIST = round(distanceTotal / rationaleDistMeasures,2)
                     return FINAL_DIST
                 
         if kill_event.is_set():
@@ -270,7 +280,8 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
             py_reset_event.set()
             while py_reset_event.is_set() and processes[1].is_alive():
                 time.sleep(0.5)
-                print("[MainFile] : waiting for yaw motor reset 1")
+                if py_reset_event.is_set():
+                    print("[MainFile] : waiting for yaw motor reset 1")
             
             for p in processes:
                 if working_on_the_Pi:
@@ -433,7 +444,8 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
 
                     playerspeed = temp_dist / temp_time  # meters/second
                     # the idea is to stay ahead of the player by at least a second or two
-                    FUT_FINAL_DIST = PRE_FINAL_DIST + playerspeed * lead_time
+                    FUT_FINAL_DIST = round(PRE_FINAL_DIST + playerspeed * lead_time, 2)
+                    # print("[MainFile]: FUT_FINAL_DIST: ", FUT_FINAL_DIST)
                     z_dist_deque.appendleft(PRE_FINAL_DIST)
                     z_dist_deque.pop()
                     # FUTURE DISTANCE
@@ -491,7 +503,8 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
         py_reset_event.set()
         while py_reset_event.is_set() and processes[1].is_alive():
             time.sleep(0.5)
-            print("[MainFile] : waiting for yaw motor reset 2")
+            if py_reset_event.is_set():
+                print("[MainFile] : waiting for yaw motor reset 2")
 
         for p in processes:
             time.sleep(1)
@@ -503,8 +516,12 @@ def startMainFile(speed, difficulty, drillType, pause_event, kill_event, PitchYa
             RED_1.off()
             RED_2.off()
             RED_3.off()
-            
-        print("[MainProcess]: Closing MainFile")
+        print("------------------------------")    
+        print("[MainProcess]: MainFile Closed")
+        print("------------------------------")
+        print("")
+        print("Start a new Drill?")
+
 
         sys.exit()
     else:
