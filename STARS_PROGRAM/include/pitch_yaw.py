@@ -147,6 +147,7 @@ SEND to STACKS:
 
         # ** __ IMPORTANT VARIABLES: __ ** #
         self.avg_measure = 10
+        self.Uno_write_lock = Event()
         self.LEAD_SPEED = 25  # << Adjust the added motorSpeed of the YAW for DYNAMIC MODE (0-255)
         self.MAX_YAW_SPEED = 0.15  # << Maximum speed of Yaw in radians
 
@@ -201,13 +202,17 @@ SEND to STACKS:
 
     def shutdown_reset_function(self):
         # if self.shutdown_event.is_set():
+        # print("resetting YAW")
         while not self.py_reset_event.is_set():
             time.sleep(0.1)
 
         print("[PitchYaw] : Resetting Motors")
-        motorSpeed = "300"
+        motorSpeed = "5000"
         pitchAngle = "0"
-        data = '<' + motorSpeed + ', ' + pitchAngle + '>'
+        data = '<' + motorSpeed + ',' + pitchAngle + '>'
+        print("sending reset data:  ", data)
+        time.sleep(1)
+        self.Uno_write_lock.set()
         self.UNO.write(data.encode())
         self.py_reset_event.clear()
 
@@ -215,7 +220,7 @@ SEND to STACKS:
     def motor_controller(self):
 #        start_time1 = time.time()
         # ** _________________ PITCH ANGLE: __________________ ** #
-
+        print("[PitchYaw]: Used Distance: ", self.usedDistance)
         # Query table for angle at self.usedDistance
         row = round((self.usedDistance - 0.99) / 2) - 2
         if row < 0:
@@ -223,34 +228,37 @@ SEND to STACKS:
         elif row > 10:
             row = 10
         pitchAngle = self.pitchAngleTable[row, 1] + self.launcherAngle
+        
+        self.latPixelDisp = (3280 - self.LeftXcoord - self.RightXcoord)
 
 # ''' PID CALCULATION:(scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)'''
 
-        pid.update(self.latPixelDisp)
-        pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
-        scaled_pid = int((pid_output / 280) * 255)
+#        pid.update(self.latPixelDisp)
+#        pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
+#        scaled_pid = int((pid_output / 280) * 255)
+#
+#        if abs(scaled_pid) <= 10:
+#            mapped_pid = 0
+#        elif scaled_pid <= -100:
+#            mapped_pid = -100
+#        elif scaled_pid >= 100:
+#            mapped_pid = 100
+#        elif scaled_pid == 0:
+#            mapped_pid = 0
+#        elif scaled_pid > 0:
+#            mapped_pid = np.interp(scaled_pid, [0, 100], [60, 160])
+#        elif scaled_pid < 0:
+#            mapped_pid = np.interp(scaled_pid, [-100, 0], [-160, -60])
 
-        if abs(scaled_pid) <= 10:
-            mapped_pid = 0
-        elif scaled_pid <= -100:
-            mapped_pid = -100
-        elif scaled_pid >= 100:
-            mapped_pid = 100
-        elif scaled_pid == 0:
-            mapped_pid = 0
-        elif scaled_pid > 0:
-            mapped_pid = np.interp(scaled_pid, [0, 100], [60, 160])
-        elif scaled_pid < 0:
-            mapped_pid = np.interp(scaled_pid, [-100, 0], [-160, -60])
 
-
-        motorSpeed = str(int(mapped_pid))
+        motorSpeed = str(int(self.latPixelDisp))
         
         # ** ___ SEND DATA ___ ** #
         #self.UNO.reset_output_buffer()
         data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
 #        print("[PitchYaw]: UNO Data =  ",data,"  Pixel Disp = ", self.latPixelDisp)
-        self.UNO.write(data.encode())
+        if not self.Uno_write_lock.is_set():
+            self.UNO.write(data.encode())
 #        if self.py_loop_count == 10:
 #            print("[PitchYaw:Future] SENT: <motorSpeed, pitchAngle> =  " + data)
 #        print("[motor_controller]:  ",1/(time.time() - start_time1))
@@ -259,7 +267,7 @@ SEND to STACKS:
         # ___________________ GET stereoStack DATA ___________________ #
         cameradata = False
 
-        while not cameradata and not self.kill_event.is_set(): # and not self.shutdown_event.is_set() and not self.kill_event.is_set():
+        while not cameradata and not self.kill_event.is_set() and not self.pause_event.is_set(): 
             try:
                 start_time2 = time.time()
                 try:
@@ -269,7 +277,7 @@ SEND to STACKS:
 #                    if time1 > 0.15:
 #                    print("[get_stereo]: 'get' from Queue: ",round(time1,2))
                 except Exception as e:
-                    print("[PitchYaw]: ", e)
+                    print("[PitchYaw]: getting stereo timed out (1s)", e)
                     continue
                 else:
                     tempData = "".join(self.stereoData)
@@ -279,9 +287,9 @@ SEND to STACKS:
                     self.RightXcoord = int(float(tempData[0]))  
                     self.LeftXcoord = int(float(tempData[1]))  
                     # self.stereoDist = float(tempData[2])
-                    disparity = abs(self.LeftXcoord - self.RightXcoord)
-                    if disparity == 0:
-                        disparity = 1
+                    self.disparity = abs(self.LeftXcoord - self.RightXcoord)
+                    if self.disparity == 0:
+                        self.disparity = 1
                     self.stereoDist = round((self.focalsize * self.baseline) / (self.disparity * self.pixelsize), 2)
 #                    print("Left: ", self.LeftXcoord, " Right: ", self.RightXcoord," Dist: ", self.stereoDist)
 #                    print("[get_stereo]: strip/split: ",(time.time() - start_time2))
@@ -308,6 +316,11 @@ SEND to STACKS:
 
         if self.kill_event.is_set():
             self.shutdown_reset_function()
+            
+        if self.pause_event.is_set():
+            print("[Launcher] : Paused Drill")
+            while self.pause_event.is_set():
+                time.sleep(1)
 
                 # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
 #                ster_time = (time.time() - start_time2)
@@ -335,7 +348,7 @@ SEND to STACKS:
     # def lateral_speed(self):
     #     ___________________ PLAYER SPEED DEQUE ___________________ #
     #
-    #     if len(self.measure_time_deque) >= 2 and len(self.dist_deque) >= 2:
+    #     if len(self.measure_time_deque) >= 2 prand len(self.dist_deque) >= 2:
     #         displacement = self.dist_deque[len(self.dist_deque) - 1] - self.dist_deque[len(self.dist_deque) - 2]
     #         changein_time = self.measure_time_deque[len(self.measure_time_deque) - 1] - self.measure_time_deque[ len(self.measure_time_deque) - 2]
     #         self.Check_speed = displacement / changein_time
@@ -399,10 +412,10 @@ SEND to STACKS:
         #  print('[PitchYaw] : in common_data')
         gpio_blinker(self.color, self.py_loop_count, self.working_on_the_Pi)
         self.py_loop_count = loop_counter(self.py_loop_count)
-        print("in stereo")
+        #print("in stereo")
 
         self.get_stereo()
-        print("got stereo")
+        #print("got stereo")
         # self.wait_for_begin
         # self.lateral_speed
 #        FPS = time.time() - start_comm
