@@ -38,7 +38,7 @@ class gui_app():
             kill_event.clear()
         else:
             def StartProgram(ballSpeed, difficulty, drillType):
-                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera)
+                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera).run()
 
             self.ballSpeed = ballSpeed
             self.difficulty = difficulty
