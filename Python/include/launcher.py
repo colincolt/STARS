@@ -176,7 +176,7 @@ SEND to STACKS:
 - sendfinalDistStack
 - sendTemperatureStack'''
 
-    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset, launch_event):
+    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset, launch_event,voice_cont):
         super(Launcher, self).__init__()
         self.send_mega_data = send_mega_data
         self.gui_data = gui_data
@@ -188,6 +188,7 @@ SEND to STACKS:
         self.pause_event = pause_event
         self.py_reset = py_reset
         self.launch_event = launch_event
+        self.voice_control = voice_cont
         if self.working_on_the_Pi:
             self.color = led_color
 
@@ -478,7 +479,8 @@ SEND to STACKS:
                 # print("LAUNCHER: Speed:  " + str(drillSpeed) + "  Diff:  " + str(difficulty) + "  Type:  " + str(drillType))
 
                 # _____________________WAIT FOR VOICE COMMAND and TEMP TO BEGIN DRILL _____________________
-                self.wait_for_voice()
+                if self.voice_control.is_set():
+                    self.wait_for_voice()
 
                 # ****SET TEMPERATURE CORRECTION FACTOR*****
                 self.tempCorrect = 1  # self.temperature / 25

@@ -14,10 +14,10 @@ def return_data(distance):
     ballfeed="1"
 
     pitchAngleTable = np.array([[7.5, 5],  # << Pitch angle lookup table based on estimations
-                                         [12.5, 12],
-                                         [17.5, 20],
-                                         [22.5, 30],
-                                         [25, 37]])
+                                [12.5, 12],
+                                [17.5, 20],
+                                [22.5, 30],
+                                [25, 37]])
 
 #    RPM = -1.14 * used_distance ** 2.0 + 98.0 * used_distance + 646.0  # <-- Polynomial fit
 #    RPS = RPM / 60
@@ -64,9 +64,11 @@ def return_data(distance):
     estimated_tof = (0.120617 * used_distance) * 1000  # + difficulty_time
     estimated_tof = round(estimated_tof, 2)
     motor_speed = str(int(PERIOD))
+    drill_type = "0"
+
     #
     mega_data = '<' + motor_speed + ',' + motor_speed + ',' + str(targetChoice) + ',' + str(
-        difficulty) + ',' + ballfeed + ',' + str(estimated_tof) + '>'
+        difficulty) + ',' + ballfeed + ',' + str(estimated_tof) + ','+drill_type+'>'
 
     # Query table for angle at self.usedDistance
 #    row = round((used_distance - 0.99) / 2) - 2
@@ -92,8 +94,8 @@ def return_data(distance):
         pitchAngle = pitchAngleTable[row, 1]
     else:
         pitchAngle = 10
-    
-    uno_data = '<0,'+str(pitchAngle)+'>'
+
+    uno_data = '<0,'+str(pitchAngle)+','+drill_type+'>'
 
     all_data = mega_data + "_" + uno_data
     return all_data
@@ -131,7 +133,7 @@ def get_mega(close_event):
     else:
         try:
             MEGA.baudrate = 115200
-            send_data = "<0,0,1,-1,0,0>"
+            send_data = "<-1,-1,1,-1,0,0,0>"
             wait_for_data(MEGA, close_event)
             print(send_data)
             MEGA.write(send_data.encode())
@@ -200,7 +202,8 @@ def launch(MEGA, UNO, Mega_data, Uno_data,close_launch):
 
     difficulty = "2"
     ballFeed = "1"
-    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + '>'
+    drill_type = "0"
+    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
 
     time.sleep(3)
 
