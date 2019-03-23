@@ -12,6 +12,7 @@ pause_event = mp.Event()
 kill_event = mp.Event()
 close_launch = mp.Event()
 show_camera = mp.Event()
+voice_control = mp.Event()
 
 
 global startThread
@@ -28,7 +29,7 @@ class gui_app():
         self.ballSpeed = 1
         self.difficulty = 1
         self.drillType = "No Drill"
-        self.motor_data = "<0,0,0,0,0,0>"
+        self.motor_data = "<0,0,0,0,0,0,0>"
 
 
     def START(self, ballSpeed, difficulty, drillType):
@@ -38,7 +39,7 @@ class gui_app():
             kill_event.clear()
         else:
             def StartProgram(ballSpeed, difficulty, drillType):
-                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera).run()
+                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera,voice_control).run()
 
             self.ballSpeed = ballSpeed
             self.difficulty = difficulty
@@ -52,7 +53,10 @@ class gui_app():
         senderstr = str(sender)
         try:
             if self.startThread.isAlive():
-                pause_event.set()
+                if pause_event.is_set():
+                    pause_event.clear()
+                else:
+                    pause_event.set()
         except:
             print("[GUI] : Drill not started")
 
@@ -139,9 +143,18 @@ class gui_app():
     def show_cam(self):
         if show_camera.is_set():
             show_camera.clear()
+            print("[GUI] : Hiding the camera")
         else:
             show_camera.set()
             print("[GUI] : Showing the camera")
+
+    def enable_voice(self):
+        if voice_control.is_set():
+            voice_control.clear()
+            print("[GUI] : Voice Control disabled")
+        else:
+            voice_control.set()
+            print("[GUI] : Voice Control enabled")
 
 
     def staticDrill(self,appname):
@@ -164,7 +177,7 @@ class gui_app():
         speed.bg = "white"
         speed.text_size=14
 
-        Slide2 = Text(self.window1, "Passing Difficulty:", size=14, font="Calibri Bold", color="white",
+        Slide2 = Text(self.window1, "Pass Difficulty:", size=14, font="Calibri Bold", color="white",
                       grid=[3, 1])
         difficulty = Slider(self.window1, command=self.difficulty_slider, start=1, end=5, grid=[3, 2])
         difficulty.width = 150
@@ -193,12 +206,12 @@ class gui_app():
         camera.bg = "#002ff5"
         camera.text_color = "white"
 
-
-
-        Center = Box(self.window1, width=50, height=200, grid=[2, 1, 1, 7])
+        Center = Box(self.window1, width=50, height=165, grid=[2, 1, 1, 7])
         Left = Box(self.window1, width=60, height=200, grid=[0, 0, 1, 7])
         Right = Box(self.window1, width=20, height=200, grid=[4, 0, 1, 7])
 
+        VC = PushButton(Center, command=self.enable_voice, args=[],
+                      image="include/images/micbut.png", align="bottom")
 
     def predictiveDrill(self,appname):
         appname = appname
@@ -222,7 +235,7 @@ class gui_app():
         speed.bg = "white"
         speed.text_size=14
 
-        Slide2 = Text(self.window2, "Passing Difficulty:", size=14, font="Calibri Bold", color="white", grid=[3, 1])
+        Slide2 = Text(self.window2, "Pass Difficulty:", size=14, font="Calibri Bold", color="white", grid=[3, 1])
         difficulty = Slider(self.window2, command=self.difficulty_slider, start=1, end=5, grid=[3, 2]) #, 2, 1])
         difficulty.width = 150
         difficulty.text_color = "black"
@@ -246,9 +259,12 @@ class gui_app():
         camera.bg = "#002ff5"
         camera.text_color = "white"
 
-        Center = Box(self.window2,width=50,height=200,grid=[2,1,1,7])
+        Center = Box(self.window2,width=50,height=165,grid=[2,1,1,7])
         Left = Box(self.window2,width=60,height=200,grid=[0,0,1,7])
         Right = Box(self.window2,width=20,height=200,grid=[4,0,1,7])
+
+        VC = PushButton(Center, command=self.enable_voice, args=[],
+                        image="include/images/micbut.png", align="bottom")
 
 
 
@@ -270,7 +286,7 @@ class gui_app():
         speed.bg = "white"
         speed.text_size=14
 
-        Slide2 = Text(self.window3, "Passing Difficulty:", size=14, font="Calibri Bold", color="white",
+        Slide2 = Text(self.window3, "Pass Difficulty:", size=14, font="Calibri Bold", color="white",
                       grid=[3, 1])
         difficulty = Slider(self.window3, command=self.difficulty_slider, start=1, end=5, grid=[3, 2])  # , 2, 1])
         difficulty.width = 150
@@ -337,7 +353,7 @@ app = App(title="S.T.A.R.S. User Interface", layout="grid", height=320, width=48
 # MainBox = Box(app,grid=[0,0])
 
 welcome_message = Text(app, "Welcome to S.T.A.R.S.", size=20, font="Calibri Bold", color="red", grid=[1,0,2,1])
-second_message = Text(app, "Let's play some soccer!", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
+second_message = Text(app, "Please select a drill: ", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
 logo = Picture(app, image="include/images/logo.gif", align="left", grid=[0,0])
 logo.resize(75, 75)
 logoright = Picture(app, image="include/images/logo.gif", align="left", grid=[3,0])
