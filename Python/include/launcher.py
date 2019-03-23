@@ -176,7 +176,7 @@ SEND to STACKS:
 - sendfinalDistStack
 - sendTemperatureStack'''
 
-    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset):
+    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset, launch_event):
         super(Launcher, self).__init__()
         self.send_mega_data = send_mega_data
         self.gui_data = gui_data
@@ -187,6 +187,7 @@ SEND to STACKS:
         self.kill_event = kill_event
         self.pause_event = pause_event
         self.py_reset = py_reset
+        self.launch_event = launch_event
         if self.working_on_the_Pi:
             self.color = led_color
 
@@ -407,7 +408,7 @@ SEND to STACKS:
             self.send_data = '<'+motor_period+','+motor_period+','+str(targetChoice)+','+str(self.difficulty)+','+self.ballfeed+','+str(estimated_tof)+','+drill_type+'>'
             print(self.send_data)
             send_mega_stack.push(self.send_data)
-            print("[Launcher] : BALL NUMBER :  ", self.drillCount)
+            # print("[Launcher] : BALL NUMBER :  ", self.drillCount)
             self.send_flag.set()
             while self.send_flag.is_set():
                 time.sleep(0.1)
@@ -424,6 +425,9 @@ SEND to STACKS:
         # ____________________ Write data to MEGA ____________________
         send_mega_stack.push(self.send_data)
         print("[Launcher] : BALL NUMBER :  ", self.drillCount)
+        ## NEW
+        self.launch_event.set()
+        ##_____
         self.send_flag.set()
         while self.send_flag.is_set():
             time.sleep(0.1)
@@ -518,8 +522,13 @@ SEND to STACKS:
         self.WAIT_TIME = self.DYNAMIC_WAIT_TIME
         print("[Launcher] : Beginning Drill")
         self.first_launch = True
-        # ___________________ HOLD THE LAUNCHER SEQUENCE FOR 3-4 SECONDS: ___________________
+
         while self.drillCount <= 5 and not self.kill_event.is_set():
+            if self.pause_event.is_set():
+                print("[Launcher] : Paused Drill")
+                while self.pause_event.is_set():
+                    time.sleep(1)
+
             try:
                 self.get_mega_data()
             except serial.SerialException as err:
@@ -534,9 +543,10 @@ SEND to STACKS:
                 self.launcher_common()
                 self.ballfeed = "0"
                 self.send_launch_data()
+                motor_start_time = time.time()
 
                 try:
-                    self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 2)  # <<<<< GET PREDICTED LOCATION
+                    self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 2.5)  # <<<<< GET PREDICTED LOCATION
                     print("[Launcher]: FUT_FINAL_DIST:  ",self.FUT_FINAL_DIST)
                 except:
                     print("[Launcher] : Failed to get FUT FINAL DIST")
@@ -547,10 +557,16 @@ SEND to STACKS:
                         print("[Launcher] : Sending launch data as is")
                         self.ballfeed = "1"
 
+                        while time.time() - motor_start_time < 3:
+                            time.sleep(0.2)
+
                         self.send_launch_data()
                     else:
                         self.used_distance = self.FUT_FINAL_DIST
                         self.ballfeed = "1"
+
+                        while time.time() - motor_start_time < 3:
+                            time.sleep(0.2)
 
                         self.send_launch_data()
 
@@ -582,7 +598,9 @@ SEND to STACKS:
 
                 self.send_launch_data()
 
-        print("[Launcher] : Drill Ending  ",self.drillCount)
+        print("[Launcher] : Drill Ending  ")
+        if self.drillCount >= 5:
+            self.wait_for_target()
         self.close_drill()
 
     def manual_drill(self):
@@ -605,7 +623,9 @@ SEND to STACKS:
                 self.ballfeed = "1"
                 self.send_launch_data()
 
-        print("[Launcher] : Drill Ending  ",self.drillCount)
+        print("[Launcher] : Drill Ending  ")
+        if self.drillCount >= 5:
+            self.wait_for_target()
         self.close_drill()
 
 

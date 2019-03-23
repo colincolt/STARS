@@ -81,7 +81,7 @@ SEND to STACKS:
 
     def __init__(self, guiData, get_stereo_data, stereo_py_main, final_dist_py,
                  future_dist_py, pi_no_pi, led_color, kill_event, py_reset_event, pause_event, stereo_data_flag,
-                 pymain_stereo_flag):
+                 pymain_stereo_flag, launch_event):
         super(PitchYaw, self).__init__()
         self.guiData = guiData
         self.get_stereo_data = get_stereo_data
@@ -95,6 +95,7 @@ SEND to STACKS:
         self.pause_event = pause_event
         self.stereo_data_flag = stereo_data_flag
         self.pymain_stereo_flag = pymain_stereo_flag
+        self.launch_event = launch_event
         # ** __ RECORD A LIST OF OLD MEASUREMENTS FOR TRACKING: __ ** #
         self.dist_deque = deque([])
         self.x_disp_deque = deque([])
@@ -136,6 +137,9 @@ SEND to STACKS:
         self.max_measures = 20
         self.first_new = False
         self.distances =deque([])
+        self.pixel_disps = deque([])
+        self.predictions = 0
+
         self.replacements = 0
 
 
@@ -167,22 +171,22 @@ SEND to STACKS:
 
     def motor_controller(self):
         #        start_time1 = time.time()
-        # ************ NEW DATA SMOOTHER (MAY NEED TUNING) ***************** #
+#   ______________________________ PITCH SMOOTHING  ______________________________ #
         new_distance = self.usedDistance
         # print("[PitchYaw]:", new_distance)
         first_new = False
         if len(self.distances) == self.max_measures:
-            moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
+            mov_dist_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
             
-            if abs(new_distance - moving_avgs[15]) <= 2.0:
+            if abs(new_distance - mov_dist_avgs[15]) <= 2.0:
                 self.replacements = 0
                 self.distances.append(new_distance)
 #                print("stereo ",self.distances)
             else:
                 self.replacements +=1
                 if self.replacements <= 10:
-                    slope1 = moving_avgs[14] - moving_avgs[13]
-                    slope2 = moving_avgs[15] - moving_avgs[14]
+                    slope1 = mov_dist_avgs[14] - mov_dist_avgs[13]
+                    slope2 = mov_dist_avgs[15] - mov_dist_avgs[14]
                     avg_change = (slope1 + slope2) / 2
                     new_distance = float(round(self.distances[19] + avg_change,2))
                     #print(new_distance)
@@ -217,13 +221,58 @@ SEND to STACKS:
         else:
             pitchAngle = 10
 
+#   ______________________________ YAW SMOOTHING/TRACKING  ______________________________ #
+
         self.latPixelDisp = (3280 - self.LeftXcoord - self.RightXcoord)
+
+        new_pix = self.latPixelDisp
+
+        if len(self.pixel_disps) == self.max_measures:
+            mov_pix_avgs = np.convolve(self.pixel_disps, np.ones((5)) / 5, mode='valid')
+
+            if abs(new_pix - mov_pix_avgs[15]) <= 2000: # << REALLY LARGE SO IT WONT REALLY AFFECT ANYTHING YET
+                self.pix_replace = 0
+                self.pixel_disps.append(new_pix)
+            #                print("stereo ",self.distances)
+            else:
+                self.pix_replace += 1
+                if self.pix_replace <= 10:
+                    p_slope1 = mov_pix_avgs[15] - mov_pix_avgs[14]
+                    p_slope2 = mov_pix_avgs[14] - mov_pix_avgs[13]
+                    avg_pix_change = (p_slope1 + p_slope2) / 2
+                    new_pix = float(round(self.pixel_disps[19] + avg_pix_change, 2))
+                    # print(new_distance)
+                    self.pixel_disps.append(new_pix)
+                    print("replaced pixel disp: ", self.pixel_disps)
+                # else:
+                #     distances = deque([])
+                #     new_distance = stereo_Distance
+                #     distances.append(new_distance)
+            self.distances.popleft()
+        else:
+            self.pixel_disps.append(new_pix)
+            print("populating pixel disp: ... ", self.pixel_disps)
 
         # ** ___ SEND DATA ___ ** #
         if self.drillType == "Dynamic":
-            data = '<' + str(self.latPixelDisp) + ', ' + str(pitchAngle) + ',1>'
+            drill_type = "1"
+
+            ## "PREDICTION" FOR DYNAMIC
+            if self.launch_event.is_set():
+                if self.predictions <= 5:
+                    avg_displacement = sum(self.pixel_disps[9:19]) / 10
+                    if avg_displacement < 0:
+                        new_pix = - 3000
+                    elif avg_displacement > 0:
+                        new_pix = 3000
+                    self.predictions += 1
+                else:
+                    self.launch_event.clear()
+                    self.predictions = 0
         else:
-            data = '<' + str(self.latPixelDisp) + ', ' + str(pitchAngle) + ',0>'
+            drill_type = "0"
+
+        data = '<' + str(new_pix) + ', ' + str(pitchAngle) + ',' + drill_type + '>'
 
         #        print("[PitchYaw]: UNO Data =  ",data)
         if not self.Uno_write_lock.is_set():
@@ -341,33 +390,23 @@ SEND to STACKS:
 
     def common_data(self):
         self.start_time = time.time()
-        if self.pause_event.is_set():
-            print("[Launcher] : Paused Drill")
-            while self.pause_event.is_set():
-                time.sleep(1)
+        # if self.pause_event.is_set():
+        #     print("[Launcher] : Paused Drill")
+        #     while self.pause_event.is_set():
+        #         time.sleep(1)
         gpio_blinker(self.color, self.py_loop_count, self.working_on_the_Pi)
         self.py_loop_count = loop_counter(self.py_loop_count)
 
         self.get_stereo()
-        # self.wait_for_begin
-        # self.lateral_speed
 
-    #        FPS = time.time() - start_comm
-    #        print("[PitchYaw] ; common data FPS ", FPS)
-    #        return
-    # print("[PitchYaw] : completed 'common_data'")
 
     def dynamic_drill(self):
         futureDist = False
-        while True and not self.kill_event.is_set():  # not self.shutdown_event.is_set() and not self.kill_event.is_set():
+        while not self.kill_event.is_set():
             # start_time = time.time()
-            # <<< BEGINNING OF PITCHYAW LOOP __________
             self.common_data()
-            # print('[PitchYaw] : done common_data        data = str(right_xcoord), ",", str(left_xcoord)  #, ",", str(distance)
-            #            start_time3 = time.time()
             try:  # Try for FUT_FINAL_DIST _______________
                 try:
-                    # FPS = time.time() - self.start_time
                     FUT_FINAL_DIST = self.future_dist_py.get_nowait()
                     if FUT_FINAL_DIST is not None:
                         futureDist = True
@@ -391,31 +430,13 @@ SEND to STACKS:
                 # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
 
                 if futureDist:      # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
-                    # print("[PY] sending fut_final_dist")
                     self.usedDistance = FUT_FINAL_DIST
-                    #                    if not self.first_measure:  #
-                    #                        self.dist_deque.appendleft(self.usedDistance)
-                    #
-                    #                    if len(self.dist_deque) > self.avg_measure:
-                    #                        self.dist_deque.pop()
-
                     if self.usedDistance > 25.0:
                         self.usedDistance = 25.0
-                    FPS = time.time() - self.start_time
-                    #                    print("[PitchYaw] : drill b4 motor_controll ", FPS)
                     self.motor_controller()
-                    # FPS = time.time() - start_time
-                    # print("[PitchYaw] : drill after motor_controll ", FPS)                         # <<<<<SEND DATA TO MOTORS
-                    # time.sleep(0.1)
-                    #                self.endtime = time.time() - starttime
-
                 elif finalDist:
-                    # print("[PY] sending final_dist")
                     self.usedDistance = FINAL_DIST
-                    # FPS = time.time() - start_time
                     self.motor_controller()
-                    # FPS = time.time() - start_time
-
                 else:
                     try:
                         self.usedDistance = self.stereoDist

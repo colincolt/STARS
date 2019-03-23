@@ -173,6 +173,7 @@ class startMainFile():
         self.future_dist_py = mp.Queue()
         self.final_dist_py = mp.Queue()
         self.data_flag = mp.Event()
+        self.launch_event = mp.Event()
         self.processes = []
 
         # __ GUI Input __ #
@@ -226,10 +227,10 @@ class startMainFile():
         # Get(WAIT) for stereoDistance _____________________________
         stereo = False
         while not stereo and not self.kill_event.is_set():
-            if self.pause_event.is_set():
-                print("[MainProcess] : PAUSE BUTTON PRESSED")
-                while self.pause_event.is_set():
-                    time.sleep(1)
+            # if self.pause_event.is_set():
+            #     print("[MainProcess] : PAUSE BUTTON PRESSED")
+            #     while self.pause_event.is_set():
+            #         time.sleep(1)
             if self.kill_event.is_set():
                 self.shutdown_func()
             try:
@@ -328,13 +329,8 @@ class startMainFile():
 #                        tempData = tempData.strip("<")
 #                        tempData = tempData.strip(">")
 #                        tempData = tempData.split(",")
-#                        # print("[MainFile] : Tempdata=  " + str(tempData))
 #
 #                        lidar_2_Distance = int(tempData[0])  # lidarDistance = int(cm)
-#                        #                        temperature = int(tempData[1])  # temperature = int()
-#                        #                        voiceCommand = int(tempData[2])  # voice commands = int(from 1 to 5)
-#                        #                        targetTiming = int(tempData[3])  # targetTiming = float(0.0)
-#                        #                        targetBallSpeed = float(tempData[4])  # targetBallSpeed
 #
 #                        print("[MainProcess] Garmin : ", lidar_2_Distance, " meters")
 #                        if lidar_2_Distance is not None and abs(stereo_Distance - lidar_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
@@ -344,10 +340,6 @@ class startMainFile():
 #                        # print("[MainProcess] : LIDAR_2 -> no data" + str(w))
 #                        pass
 
-#                else:
-                
-
-        
 
     def get_future_dist(self):
         if len(self.distances) == self.max_measures:
@@ -358,7 +350,6 @@ class startMainFile():
             return future_distance
         else:
             return None
-
 
     def run(self):
         if working_on_the_Pi:
@@ -418,7 +409,7 @@ class startMainFile():
             try:
                 PitchYaw = pitch_yaw.PitchYaw(self.guiData, self.stereo_data, self.stereo_py_main, self.final_dist_py, self.future_dist_py,
                                               working_on_the_Pi, YELLOW, self.kill_event, self.py_reset_event, self.pause_event, self.data_flag,
-                                              self.pymain_stereo_flag)
+                                              self.pymain_stereo_flag, self.launch_event)
                 self.processes.append(PitchYaw)
                 if working_on_the_Pi:
                     RED_2.on()
@@ -430,7 +421,7 @@ class startMainFile():
         if self.StartLauncher:
             try:
                 Launch = launcher.Launcher(self.guiData, self.mega_data, self.final_dist_l, self.future_dist_l, working_on_the_Pi, WHITE,
-                                           self.kill_event, self.pause_event, self.py_reset_event)
+                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event)
                 self.processes.append(Launch)
                 if working_on_the_Pi:
                     RED_3.on()
@@ -458,12 +449,13 @@ class startMainFile():
         self.replacements = 0
         while not self.kill_event.is_set():
 
-            if self.pause_event.is_set():
-                print("[MainProcess] : PAUSE BUTTON PRESSED")
-                while self.pause_event.is_set():
-                    time.sleep(1)
+            # if self.pause_event.is_set():
+            #     print("[MainProcess] : PAUSE BUTTON PRESSED")
+            #     while self.pause_event.is_set():
+            #         time.sleep(1)
 
             if self.guiData.drilltype == "Dynamic":
+# _________________ PREDICTIVE TRACKING DRILL _________________  #
                 if working_on_the_Pi:
                     if loop_count % 2 == 0:
                         BLUE.on()
@@ -494,6 +486,7 @@ class startMainFile():
                         self.future_dist_l.put(future_distance)
                         self.future_dist_py.put(future_distance)
 
+# _________________ BASIC TRACKING DRILL _________________  #
             elif self.guiData.drilltype == "Static":
                 if working_on_the_Pi:
                     if loop_count % 2 == 0:
@@ -508,15 +501,15 @@ class startMainFile():
 
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
-                    PRE_FINAL_DIST = self.get_distances(self.distances,self.replacements)
+                    current_dist = self.get_distances()
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
-                    self.final_dist_l.put(PRE_FINAL_DIST)
-                    self.final_dist_py.put(PRE_FINAL_DIST)
+                    self.final_dist_l.put(current_dist)
+                    self.final_dist_py.put(current_dist)
                 except:
                     print("[MainProcess] : Waiting for FINAL distance")
                     continue
 
-
+# _________________ WAIT FOR VC BASIC TRACKING DRILL _________________  #
             elif self.guiData.drilltype == "Manual":
                 if working_on_the_Pi:
                     if loop_count % 2 == 0:
@@ -531,11 +524,11 @@ class startMainFile():
 
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
-                    PRE_FINAL_DIST = self.get_distances(self.distances, self.replacements)
-                    print("NEW: ", PRE_FINAL_DIST)
+                    current_dist = self.get_distances()
+                    # print("NEW: ", current_dist)
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
-                    self.final_dist_l.put(PRE_FINAL_DIST)
-                    self.final_dist_py.put(PRE_FINAL_DIST)
+                    self.final_dist_l.put(current_dist)
+                    self.final_dist_py.put(current_dist)
                 except:
                     print("[MainProcess] : Waiting for FINAL distance")
                     continue
