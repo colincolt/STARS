@@ -354,9 +354,9 @@ app = App(title="S.T.A.R.S. User Interface", layout="grid", height=320, width=48
 
 welcome_message = Text(app, "Welcome to S.T.A.R.S.", size=20, font="Calibri Bold", color="red", grid=[1,0,2,1])
 second_message = Text(app, "Please select a drill: ", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
-logo = Picture(app, image="include/images/logo.gif", align="left", grid=[0,0])
+logo = Picture(app, image="include/images/logo.png", align="left", grid=[0,0])
 logo.resize(75, 75)
-logoright = Picture(app, image="include/images/logo.gif", align="left", grid=[3,0])
+logoright = Picture(app, image="include/images/logo.png", align="left", grid=[3,0])
 logoright.resize(75, 75)
 
 print('looping')
