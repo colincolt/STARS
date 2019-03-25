@@ -5,6 +5,13 @@ import random
 import sys
 import time
 import multiprocessing as mp
+from openpyxl import load_workbook, Workbook
+from guizero import App, Text, Box
+from openpyxl.chart import (
+    ScatterChart,
+    Reference,
+    Series,
+)
 # from gpiozero import LED
 
 
@@ -495,11 +502,6 @@ SEND to STACKS:
 
         self.launch_loop_count = loop_counter(self.launch_loop_count)
 
-        if not self.first_launch:
-            self.wait_for_target()
-        else:
-            self.first_launch = False
-
         self.drill_wait_time()
         
         while not launch_data and not self.kill_event.is_set():
@@ -513,6 +515,13 @@ SEND to STACKS:
             else:
                 self.used_distance = FINAL_DIST
                 launch_data = True
+
+        if not self.first_launch:
+            self.wait_for_target()
+        else:
+            self.first_launch = False
+            self.ballfeed="0"
+            self.send_launch_data()
 
         if self.pause_event.is_set():
             print("[Launcher] : Paused Drill")
@@ -543,12 +552,10 @@ SEND to STACKS:
                 continue
             else:
                 self.launcher_common()
-                self.ballfeed = "0"
-                self.send_launch_data()
-                motor_start_time = time.time()
+
 
                 try:
-                    self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 2.5)  # <<<<< GET PREDICTED LOCATION
+                    self.FUT_FINAL_DIST = self.get_future_dist.get(timeout = 5)  # <<<<< GET PREDICTED LOCATION
                     print("[Launcher]: FUT_FINAL_DIST:  ",self.FUT_FINAL_DIST)
                 except:
                     print("[Launcher] : Failed to get FUT FINAL DIST")
@@ -557,6 +564,11 @@ SEND to STACKS:
                 finally:
                     if not self.FUT_FINAL_DIST:  # <- no prediction is done in this thread so it will send AS IS
                         print("[Launcher] : Sending launch data as is")
+                        self.ballfeed = "0"
+                        self.send_launch_data()
+
+                        motor_start_time = time.time()
+
                         self.ballfeed = "1"
 
                         while time.time() - motor_start_time < 3:
@@ -565,6 +577,11 @@ SEND to STACKS:
                         self.send_launch_data()
                     else:
                         self.used_distance = self.FUT_FINAL_DIST
+                        self.ballfeed = "0"
+                        self.send_launch_data()
+
+                        motor_start_time = time.time()
+
                         self.ballfeed = "1"
 
                         while time.time() - motor_start_time < 3:
@@ -630,6 +647,136 @@ SEND to STACKS:
             self.wait_for_target()
         self.close_drill()
 
+
+    def output_to_excel(self):
+        filename = "demo_wb.xlsx"
+        self.player = "Player2"
+        ball = [0, 0, 0, 0, 0, 0]
+
+        try:
+            wb = load_workbook(filename=filename)
+            print("[Launcher]: file exists")
+            new_book = False
+        except Exception as e:
+            print("[Launcher]: file not found, making new book ")
+            wb = Workbook()
+            summary_sheet = wb.get_sheet_by_name('Sheet')
+            summary_sheet.title = 'Summary'
+            new_book = True
+
+        try:
+            players_sheet = wb[self.player]
+            print("[Launcher]: sheet exists, appending data")
+
+        except KeyError as k:
+            print("[Launcher]: creating new sheet for: ", self.player)
+            players_sheet = wb.create_sheet(title=self.player)
+
+        data_printed = False
+        col = 1
+        row = 1
+        drill = 1
+        while not data_printed:
+            if players_sheet.cell(column=col, row=row + 1).value is None:
+                players_sheet.cell(column=col, row=row + 1).value = "Drill" + str(drill)
+                if row == 1:
+                    # players_sheet.cell(column=col, row=row).value = "."
+                    players_sheet.cell(column=col + 1, row=row).value = "Ball #"
+                    players_sheet.cell(column=col + 2, row=row).value = "Time for Pass"
+                    players_sheet.cell(column=col + 3, row=row).value = "Ball Speed"
+                for i in range(5):
+                    players_sheet.cell(column=col + 1, row=row + i + 1).value = row + i
+                    players_sheet.cell(column=col + 2, row=row + i + 1).value = (self.targetTimes[i + 1] / 1000)
+                    players_sheet.cell(column=col + 3, row=row + i + 1).value = self.ballSpeeds[i + 1]
+
+                data_printed = True
+
+            else:
+                row += 5
+                drill += 1
+
+        wb.save(filename)
+
+        # PLOT THE DATA:
+        # player_sheets =
+        data_ranges = [0] * (len(wb.worksheets) - 1)
+
+        series = [0] * (len(wb.worksheets) - 1)
+
+        for i in range((len(wb.worksheets) - 1)):
+            print(str(wb.worksheets[i])[11:20])
+            gathered = False
+            coll = 1
+            roww = 1
+            drill = 1
+            chart = ScatterChart()
+            charts = [chart] * (len(wb.worksheets) - 1)
+            charts[i].title = str(self.player) + "'s  Results"
+
+            while not gathered:
+                print("Gathering..")
+                if wb.worksheets[i + 1].cell(column=coll, row=roww + 1).value is None:
+                    gathered = True
+                else:
+                    # print(wb.worksheets[i+1].cell(column=coll,row=roww+1).value)
+                    roww += 5
+                    # print("checking row: ",roww)
+                    gathered = False
+
+            # roww +=4
+            data_ranges[i] = Reference(wb.worksheets[i + 1], min_col=3, min_row=1, max_row=roww)
+
+            x_vals = Reference(wb.worksheets[i + 1], min_col=2, min_row=1, max_row=roww)
+
+            series[i] = Series(data_ranges[i], xvalues=x_vals, title_from_data=True)
+
+            # chart.add_data(data_ranges[i],titles_from_data=True)
+            charts[i].append(series[i])
+            charts[i].x_axis.title = "Test Number"
+            charts[i].x_axis.scaling.min = 0
+            charts[i].x_axis.scaling.max = roww
+            charts[i].y_axis.title = "Reaction Times (seconds)"
+            charts[i].legend = None
+
+            s1 = charts[i].series[0]
+            s1.marker.symbol = "triangle"
+            s1.marker.graphicalProperties.solidFill = "FF0000"  # Marker filling
+            s1.marker.graphicalProperties.line.solidFill = "FF0000"  # Marker outline
+
+            s1.graphicalProperties.line.noFill = True
+
+            # s2 = chart.series[1]
+            # s2.marker.symbol = "circle"
+            # s2.marker.graphicalProperties.solidFill = "FF0000"  # Marker filling
+            # s2.marker.graphicalProperties.line.solidFill = "FF0000"  # Marker outline
+            #
+            # s2.graphicalProperties.line.noFill = True
+
+            charts[i].style = 13
+            wb.worksheets[0].add_chart(charts[i], "A" + str(i + 1 + 15 * i))
+
+            # chart.y_axis.title =
+        # Style the lines
+
+        wb.save(filename)
+
+    def display_results(self):
+        ball = [0,0,0,0,0,0]
+        app = App(title="Results", layout="auto", height=320, width=480, bg="#424242", visible=True)
+        title = Text(app, str(self.player) + "'s Results for " + str(self.drillType), size=20, font="Calibri Bold", color="white")
+        subt = "Pass Difficulty: " + str(self.difficulty) + "  |  Ball Speed: " + str(self.drillSpeed)
+        subtitle = Text(app, subt, size=14, font="Calibri Bold", color="white")
+        spacer = Box(app, width=20, height=20)
+
+        for i in range(5):
+
+            ball[i + 1] = "Pass # " + str(i + 1) + ":   " + str((self.targetTimes[i + 1]) / 1000) + " sec  |  " + str(
+                self.ballSpeeds[i + 1]) + " m/s"
+            # if len(ball[i + 1]) != 25:
+            # ball[i+1] += "0"
+            Text(app, ball[i + 1], size=12, font="Calibri Bold", color="white")
+
+        app.display()
 
     def close_drill(self):
         print("[Launcher] : Drill Ending  ")
@@ -704,7 +851,6 @@ SEND to STACKS:
 #                if self.py_reset.is_set():
 #                    print('Reset flag is set')
 #                    time.sleep(1)
-                
 
             time.sleep(5)
             self.send_data = '<-1,-1,0,6,0,0.0>'
@@ -716,22 +862,30 @@ SEND to STACKS:
             self.mega_data_thread.join()
 
             print("[Launcher] : Drill COMPLETE!")
-            print("===================================")
+            print("======================================================================")
             print("   Drill Summary   ")
             print("Results for ", self.drillType, " passing drill:")
             print("User selcted a Difficulty: ", self.difficulty, " and a Speed: ", self.drillSpeed)
-            print("Ball #               :        one    two    three    four    five    ")
+            print()
+            print("Ball #               :          one    |    two    |     three    |    four    |    five    ")
             try:
                 print("Player reaction time :        ", self.targetTimes[1], "    ", self.targetTimes[2], "    ",
                       self.targetTimes[3], "    ", self.targetTimes[4], "    ", self.targetTimes[5], "    ")
                 print("Player passing speed :        ", self.ballSpeeds[1], "    ", self.ballSpeeds[2], "    ",
                       self.ballSpeeds[3], "    ", self.ballSpeeds[4], "    ", self.ballSpeeds[5], "    ")
+                print("======================================================================")
+
+
             except AttributeError as a:
                 pass
             try:
                 print("At a current temperature of :        ", self.drill_data.temp)
             except:
                 pass
+
+            self.output_to_excel()  # NEW LINEs *!*!*!*!*!*!**!*!*!*!*!*!*!
+            self.display_results()
+
             self.kill_event.set()
             sys.exit()
 

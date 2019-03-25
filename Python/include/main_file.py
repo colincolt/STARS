@@ -198,6 +198,10 @@ class startMainFile():
     #    global first_new
         self.replacements = 0
         self.distances = deque([])
+        self.times = deque([])
+        self.first_measurement = True
+
+        self.player_running = False
 
     def shutdown_func(self):
         print("[MainProcess] : EXIT BUTTON PRESSED")
@@ -259,6 +263,14 @@ class startMainFile():
                         first_new = False
                         new_distance = stereo_Distance
 #                        print("in dist check",new_distance)
+                        if not self.first_measurement:
+                            self.read_time = time.time() - self.reading_time
+                            self.times.append(self.read_time)
+                            if len(self.times) == self.max_measures:
+                                self.times.popleft()
+                        self.first_measurement = False
+                        self.reading_time = time.time()
+
                         try:
                             if len(self.distances) == self.max_measures:
 #                                print("in if")
@@ -283,6 +295,13 @@ class startMainFile():
 #                                            print(new_distance)
                                             self.distances.append(new_distance)
 #                                            print("replaced",self.distances)
+
+                                            # DETECT RUNNiNG PLAYER:
+                                            if moving_avgs[15] - moving_avgs[0] > 3:
+                                                self.player_running = True
+                                                self.player_speed = (moving_avgs[15] - moving_avgs[0])/sum(self.times[2:17])
+                                            else:
+                                                self.player_running = False
 #                                        else:
 ##                                            self.distances = deque([])
 #                                            new_distance = stereo_Distance
@@ -292,6 +311,8 @@ class startMainFile():
 #                                print("in else check")
                                 self.distances.append(new_distance)
 #                                print("populating",self.distances)
+
+
                         except Exception as e:
                             print("issue here",e)
                         else:
@@ -300,6 +321,8 @@ class startMainFile():
                             #print("[Mainfile]: Used Distance: ", new_distance)
                             # ******************************************************************* #
 #                            print("at the end")
+
+
                             rationaleDistMeasures = 1.0
                             distanceTotal = new_distance
                             FINAL_DIST = float(round(distanceTotal / rationaleDistMeasures, 2))
@@ -481,7 +504,7 @@ class startMainFile():
                     continue
                 else:
                     # _______________________ FUTURE DISTANCE PREDICTION FOR DYNAMIC _______________________ #
-                    if current_dist:
+                    if current_dist and self.player_running:
                         future_distance = self.get_future_dist()
                         # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
                         self.future_dist_l.put(future_distance)

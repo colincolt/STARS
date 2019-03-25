@@ -174,33 +174,33 @@ SEND to STACKS:
 #   ______________________________ PITCH SMOOTHING  ______________________________ #
         new_distance = self.usedDistance
         # print("[PitchYaw]:", new_distance)
-        first_new = False
-        if len(self.distances) == self.max_measures:
-            mov_dist_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
-            
-            if abs(new_distance - mov_dist_avgs[15]) <= 2.0:
-                self.replacements = 0
-                self.distances.append(new_distance)
-#                print("stereo ",self.distances)
-            else:
-                self.replacements +=1
-                if self.replacements <= 10:
-                    slope1 = mov_dist_avgs[14] - mov_dist_avgs[13]
-                    slope2 = mov_dist_avgs[15] - mov_dist_avgs[14]
-                    avg_change = (slope1 + slope2) / 2
-                    new_distance = float(round(self.distances[19] + avg_change,2))
-                    #print(new_distance)
+        if not self.futureDist:
+            if len(self.distances) == self.max_measures:
+                mov_dist_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
+
+                if abs(new_distance - mov_dist_avgs[15]) <= 2.0:
+                    self.replacements = 0
                     self.distances.append(new_distance)
-                    print("replaced ",self.distances)
-                # else:
-                #     distances = deque([])
-                #     new_distance = stereo_Distance
-                #     distances.append(new_distance)
-            self.distances.popleft()
-        else:
-            self.distances.append(new_distance)
-            print("populating... ",self.distances)
-        
+    #                print("stereo ",self.distances)
+                else:
+                    self.replacements +=1
+                    if self.replacements <= 10:
+                        slope1 = mov_dist_avgs[14] - mov_dist_avgs[13]
+                        slope2 = mov_dist_avgs[15] - mov_dist_avgs[14]
+                        avg_change = (slope1 + slope2) / 2
+                        new_distance = float(round(self.distances[19] + avg_change,2))
+                        #print(new_distance)
+                        self.distances.append(new_distance)
+                        print("replaced ",self.distances)
+                    # else:
+                    #     distances = deque([])
+                    #     new_distance = stereo_Distance
+                    #     distances.append(new_distance)
+                self.distances.popleft()
+            else:
+                self.distances.append(new_distance)
+                print("populating... ",self.distances)
+
 
         # ** _________________ PITCH ANGLE: __________________ ** #
         if new_distance <= 7.5:
@@ -401,7 +401,8 @@ SEND to STACKS:
 
 
     def dynamic_drill(self):
-        futureDist = False
+        self.futureDist = False
+        finalDist = False
         while not self.kill_event.is_set():
             # start_time = time.time()
             self.common_data()
@@ -409,12 +410,12 @@ SEND to STACKS:
                 try:
                     FUT_FINAL_DIST = self.future_dist_py.get_nowait()
                     if FUT_FINAL_DIST is not None:
-                        futureDist = True
+                        self.futureDist = True
                     else:
-                        futureDist = False
+                        self.futureDist = False
                 # Try for FINAL_DIST from Launcher(Thread) _______________
                 except:
-                    futureDist = False
+                    self.futureDist = False
                     FUT_FINAL_DIST = None       # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
                     try:
                         FINAL_DIST = self.final_dist_py.get_nowait()
@@ -429,7 +430,7 @@ SEND to STACKS:
 
                 # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
 
-                if futureDist:      # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
+                if self.futureDist:      # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
                     self.usedDistance = FUT_FINAL_DIST
                     if self.usedDistance > 25.0:
                         self.usedDistance = 25.0
