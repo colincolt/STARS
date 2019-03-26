@@ -1,5 +1,5 @@
 #!/bin/python
-from guizero import App, Text, PushButton, Window, Slider, Picture, TextBox, Box
+from guizero import App, Text, PushButton, Window, Slider, Picture, TextBox, Box, Combo
 import include.main_file as main
 import include.launch_test as test
 #import include.stereo_pool as stereo
@@ -13,6 +13,9 @@ kill_event = mp.Event()
 close_launch = mp.Event()
 show_camera = mp.Event()
 voice_control = mp.Event()
+drill_not_done = mp.Event()
+
+drill_results = mp.Queue()
 
 
 global startThread
@@ -30,7 +33,10 @@ class gui_app():
         self.difficulty = 1
         self.drillType = "No Drill"
         self.motor_data = "<0,0,0,0,0,0,0>"
+        self.player = "None"
 
+    def display_data(self):
+        print("[GUI]: ", self.results)
 
     def START(self, ballSpeed, difficulty, drillType):
         if pause_event.is_set():
@@ -39,14 +45,40 @@ class gui_app():
             kill_event.clear()
         else:
             def StartProgram(ballSpeed, difficulty, drillType):
-                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera,voice_control).run()
+                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera,voice_control,drill_results,self.player).run()
+
+            def listen_result(self):
+                no_result=False
+                # print("GUI starting listen thread")
+                while no_result:
+                    if kill_event.is_set():
+                        no_result=True
+                        print("[GUI]: No drill result")
+                    try:
+                        self.results = drill_results.get(timeout=0.5)
+                        self.display_data()
+                    except:
+                        continue
+                        # print("[GUI]: Waiting for Result")
+                    else:
+                        no_result = True
 
             self.ballSpeed = ballSpeed
             self.difficulty = difficulty
             self.drillType = drillType
             self.startThread = Thread(target=StartProgram, args=[ballSpeed, difficulty, drillType])
+            self.waitfor_result = Thread(target=listen_result,args=[self])
+
             if not self.startThread.isAlive():
                 self.startThread.start()
+            if not self.waitfor_result.isAlive():
+                self.waitfor_result.start()
+
+            # while drill_not_done.is_set():
+            #     time.sleep(3)
+            #     print("[GUI]: waiting for dill to finish")
+
+
 
     def pause_command(self, sender):
         sender = sender
@@ -156,14 +188,18 @@ class gui_app():
             voice_control.set()
             print("[GUI] : Voice Control enabled")
 
+    def player_selection(self, selection):
+        self.player = str(selection)
+        print(self.player)
+
 
     def staticDrill(self,appname):
         from guizero import Box
         appname = appname
-        second_message.value = "Static Passing Selected"
+        # second_message.value = "Static Passing Selected"
         self.drillType = "Static"
 
-        self.window1 = Window(app, bg="#424242",height=320, width=480, layout="grid")
+        self.window1 = Window(app, bg="#424242",height=280, width=480, layout="grid")
         # logo = Picture(self.window1, image="include/logo.gif", align="left", grid=[0, 0])
         # logo.resize(40, 40)
 
@@ -211,15 +247,17 @@ class gui_app():
         Right = Box(self.window1, width=20, height=200, grid=[4, 0, 1, 7])
 
         VC = PushButton(Center, command=self.enable_voice, args=[],
-                      image="include/images/micbut.png", align="bottom")
+                          image="include/images/micbut.png", align="bottom")
+        # else:
+        #     welcome_message.value = "Please Select a Player"
 
     def predictiveDrill(self,appname):
         appname = appname
-        second_message.value = "Entering Predictive Passing Mode"
+        # second_message.value = "Entering Predictive Passing Mode"
         from guizero import Box
 
         self.drillType = "Dynamic"
-        self.window2 = Window(app, bg="#424242",height=320, width=480, layout="grid")
+        self.window2 = Window(app, bg="#424242",height=280, width=480, layout="grid")
 
 
         # logo = Picture(self.window2, image="include/logo.gif", align="left", grid=[0, 0])
@@ -269,11 +307,12 @@ class gui_app():
 
 
     def manualDrill(self,appname):
+        # if self.player != "None":
         from guizero import Box
-        second_message.value = "Entering Manual Mode"
+        # second_message.value = "Entering Manual Mode"
         self.drillType = "Manual"
 
-        self.window3 = Window(app, bg="#424242",height=320, width=480, layout="grid")
+        self.window3 = Window(app, bg="#424242",height=280, width=480, layout="grid")
         # logo = Picture(self.window3, image="include/logo.gif", align="left", grid=[0, 0])
         # logo.resize(75, 75)
         Heading = Text(self.window3, "Voice Activated Launch", size=18, font="Calibri Bold", color="white",grid=[1,0,3,1])
@@ -318,13 +357,15 @@ class gui_app():
         Center = Box(self.window3, width=50, height=200, grid=[2, 1, 1, 7])
         Left = Box(self.window3, width=60, height=200, grid=[0, 0, 1, 7])
         Right = Box(self.window3, width=20, height=200, grid=[4, 0, 1, 7])
+        # else:
+        #     welcome_message.value = "Please Select a Player"
 
     def user_input(self, appname):
         from guizero import Box
         appname = appname
-        second_message.value = "User Input Selected"
+        # second_message.value = "User Input Selected"
 
-        self.window4 = Window(app, bg="#424242", height=320, width=480)
+        self.window4 = Window(app, bg="#424242", height=280, width=480)
 
         Text(self.window4, "User Input Mode", size=18, font="Calibri Bold", color="white")
 
@@ -334,7 +375,7 @@ class gui_app():
         Box(self.window4,width=100,height=10)
         distance.bg="white"
         self.textbox = TextBox(self.window4)
-        self.textbox.width = 36
+        self.textbox.width = 40
         self.textbox.bg = "white"
         self.textbox.text_size=14
         Box(self.window4,width=100,height=10)
@@ -349,42 +390,48 @@ class gui_app():
 
 ##_____Code that gets run:__________##
 # help(STEREOMAINFILE_Server)
-app = App(title="S.T.A.R.S. User Interface", layout="grid", height=320, width=480, bg="white",visible=True)
+app = App(title="S.T.A.R.S. User Interface", layout="grid", height=280, width=480, bg="#424242",visible=True)
 # MainBox = Box(app,grid=[0,0])
 
 welcome_message = Text(app, "Welcome to S.T.A.R.S.", size=20, font="Calibri Bold", color="red", grid=[1,0,2,1])
-second_message = Text(app, "Please select a drill: ", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
-logo = Picture(app, image="include/images/logo.png", align="left", grid=[0,0])
-logo.resize(75, 75)
-logoright = Picture(app, image="include/images/logo.png", align="left", grid=[3,0])
-logoright.resize(75, 75)
-
+player = Combo(app,options=["Player1","Player2","Player3","Player4","Player5"],command=gui_app().player_selection,grid=[1,1,2,1])
+player.bg = "#424242"
+player.text_color = "white"
+player.text_size=14
+Box(app,width=10,height=5,grid=[0,0])
+# second_message = Text(app, "Please select a drill: ", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
+# logo = Picture(app, image="include/images/logo.png", align="left", grid=[0,0])
+# logo.resize(75, 75)
+# logoright = Picture(app, image="include/images/logo.png", align="left", grid=[3,0])
+# logoright.resize(75, 75)
+button_width = 17
 print('looping')
 drill_1 = PushButton(app, command=gui_app().staticDrill, args=[app] ,text="Basic Tracking", grid=[1,2],width=17)
-# drill_1.width = 30
+drill_1.width = button_width
 drill_1.font="Calibri Bold"
-drill_1.bg="blue"
+drill_1.bg="#006868"
 drill_1.text_color="white"
-# drill_1.text_size=12
+drill_1.text_size = 14
 
 drill_2 = PushButton(app, command=gui_app().predictiveDrill,args=[app], text="Predictive Tracking",grid=[2,2],width=17)
-# drill_2.width = 30
+drill_2.width = button_width
 drill_2.font="Calibri Bold"
-drill_2.bg="blue"
+drill_2.bg="#006868"
 drill_2.text_color="white"
-# drill_2.text_size=12
+drill_2.text_size=14
 
 drill_3 = PushButton(app, command=gui_app().manualDrill,args=[app], text="VC w/Basic Tracking",grid=[1,3],width=17)
-# drill_3.width = 30
+drill_3.width = button_width
 drill_3.font="Calibri Bold"
-drill_3.bg="blue"
+drill_3.bg="#006868"
 drill_3.text_color="white"
-# drill_3.text_size=12
+drill_3.text_size=14
 
 input_mode = PushButton(app, command=gui_app().user_input, args=[app], text="User Input",grid=[2,3],width=17)
-input_mode.bg="blue"
+input_mode.bg="#006868"
+input_mode.width = button_width
 input_mode.text_color="white"
-# input_mode.text_size=12
+input_mode.text_size=14
 
 exit_main = PushButton(app, command=gui_app().app_exit, args=[app], image="include/images/stopbut.png",grid=[1,4,2,4])
 # exit_main.width = 20
