@@ -1,6 +1,5 @@
 import serial
 import serial.tools.list_ports
-import include.PID as PID
 from collections import deque
 from threading import Event
 import numpy as np
@@ -8,19 +7,7 @@ import time
 import multiprocessing as mp
 from gpiozero import LED
 
-# ** __ PID VARIABLES: __ ** #
-try:
-    P = 0.28
-    I = 0.0
-    D = 0.0
-    pid = PID.PID(P, I, D)
-    pid.SetPoint = 0.0
-    pid.setSampleTime(0.15)
-
-except Exception as e:
-    print("[PitchYaw] : PID Cant set Attribute  :  ", e)
-    pass
-
+startMarker = ""
 
 class Stack:
     def __init__(self):
@@ -65,9 +52,6 @@ def loop_counter(loop_number):
     return loop_number
 
 
-# _______PITCH AND YAW THREAD________ #
-
-
 def findUNO():
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
@@ -76,38 +60,9 @@ def findUNO():
     return ('NULL')
 
 
-def GetUnoData(UNO):  # , shutdown_event, kill_event):
-    getdata = False
-    dataPresent = False
-
-    while getdata == False:
-        if UNO.is_open:
-            while not dataPresent:  # and not shutdown_event.is_set() and not kill_event.is_set():
-
-                UNO.reset_input_buffer()
-
-                try:
-                    startMarker = UNO.read().decode()
-                except Exception as e:
-                    print('[GetUnoData] : didnt get UNO data' + e)
-                if startMarker == "<":
-                    unoDataStr = UNO.read(15)  # READ DATA FORMATTED AS ('< 1 >')
-                    unoDataTemp = list(unoDataStr.decode())
-                    unoDataTemp.insert(0, startMarker)
-                    unoData = unoDataTemp[:unoDataTemp.index(">") + 1]
-                    tempData = "".join(unoData)
-                    print("[GetUnoData] : tempData string  ->  ", tempData)
-                    dataPresent = True
-                    getdata = True
-                    return tempData
-        else:
-            time.sleep(0.1)
-            continue
-        time.sleep(0.4)  # << MAY NEED TO BE CHANGED IF READ DATA IS GARBAGE
-
 
 class PitchYaw(mp.Process):
-    '''PITCH_YAW_PROCESS: ---> Arduino UNO provide Angle values to both motors, request temperature's from the Uno, and distance measurements
+    '''PITCH_YAW_PROCESS: ---> Arduino UNO provide Angle values to both motors,
 RECEIVE from UNO:
 tchAngle <-- to linear actuator
 # - motorSpeed <-- to the yaw motor
@@ -126,7 +81,7 @@ SEND to STACKS:
 
     def __init__(self, guiData, get_stereo_data, stereo_py_main, final_dist_py,
                  future_dist_py, pi_no_pi, led_color, kill_event, py_reset_event, pause_event, stereo_data_flag,
-                 pymain_stereo_flag):
+                 pymain_stereo_flag, launch_event):
         super(PitchYaw, self).__init__()
         self.guiData = guiData
         self.get_stereo_data = get_stereo_data
@@ -140,7 +95,7 @@ SEND to STACKS:
         self.pause_event = pause_event
         self.stereo_data_flag = stereo_data_flag
         self.pymain_stereo_flag = pymain_stereo_flag
-        # self.stereodata = data_object
+        self.launch_event = launch_event
         # ** __ RECORD A LIST OF OLD MEASUREMENTS FOR TRACKING: __ ** #
         self.dist_deque = deque([])
         self.x_disp_deque = deque([])
@@ -173,155 +128,179 @@ SEND to STACKS:
         self.drillType = ""
         self.py_loop_count = 1
         self.endtime = None
+        self.futureDist = False
         # STEREOSCOPIC CALC:
         self.focalsize = 3.04e-03
         self.pixelsize = 1.12e-06
         self.baseline = 0.737
 
         # **** DATA SMOOTHING PARAMETERS: *********** #
-        self.max_measures = 5
+        self.max_measures = 20
         self.first_new = False
-        self.right_xcoords =[]
+        self.distances =deque([])
+        self.pixel_disps = deque([])
+        self.predictions = 0
+
+        self.replacements = 0
 
 
-
-        self.pitchAngleTable = np.array([[5, 0],  # << Pitch angle lookup table based on estimations
-                                         [7, 5],
-                                         [9, 10],
-                                         [11, 15],
-                                         [13, 20],
-                                         [15, 25],
-                                         [17, 30],
-                                         [19, 34],
-                                         [21, 35],
-                                         [23, 36],
+        self.pitchAngleTable = np.array([[7.5, 5],  # << Pitch angle lookup table based on estimations
+                                         [12.5, 12],
+                                         [17.5, 20],
+                                         [22.5, 30],
                                          [25, 37]])
 
-    # `FLASHIER PITCH TABLE FOR SHORT DISTANCES
-
-    #        self.pitchAngleTable = np.array([[5, 15],  # << Pitch angle lookup table based on estimations
-    #                                         [7, 16],
-    #                                         [9, 17],
-    #                                         [11, 18],
-    #                                         [13, 19],
-    #                                         [15, 20],
-    #                                         [17, 21],
-    #                                         [19, 22],
-    #                                         [21, 23],
-    #                                         [23, 24],
-    #                                         [25, 25]])
 
     def shutdown_reset_function(self):
-        # if self.shutdown_event.is_set():
-        # print("resetting YAW")
         while not self.py_reset_event.is_set():
             time.sleep(0.1)
-
+        
+        data = '<5000,0>'
+        print("-----------------")
         print("[PitchYaw] : Resetting Motors")
-        motorSpeed = "5000"
-        pitchAngle = "0"
-        data = '<' + motorSpeed + ',' + pitchAngle + '>'
         print("sending reset data:  ", data)
+        print("-----------------")
+
         time.sleep(1)
         self.Uno_write_lock.set()
-        self.UNO.write(data.encode())
-        self.py_reset_event.clear()
+        try:
+            self.UNO.write(data.encode())
+        except:
+            print("error sending reset")
+        else:
+            self.py_reset_event.clear()
 
     def motor_controller(self):
         #        start_time1 = time.time()
-
-        # ************ NEW DATA SMOOTHER (MAY NEED TUNING) ***************** #
-
+#   ______________________________ PITCH SMOOTHING  ______________________________ #
         new_distance = self.usedDistance
+        # print("[PitchYaw]:", new_distance)
+        if not self.futureDist:
+            if len(self.distances) == self.max_measures:
+                mov_dist_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
 
-        # right_xcoords = [3.45, 3.58, 3.63, 3.58, 4.1]
-
-        if len(self.right_xcoords) == self.max_measures:
-            moving_avgs = np.convolve(self.right_xcoords, np.ones((3,)) / 3, mode='valid')
-            if abs(new_distance - moving_avgs[2]) <= 4:
-                self.right_xcoords.append(new_distance)
-                self.first_new = True
-            else:
-                if self.first_new:
-                    self.right_xcoords.append(new_distance)
+                if abs(new_distance - mov_dist_avgs[15]) <= 2.0:
+                    self.replacements = 0
+                    self.distances.append(new_distance)
+    #                print("stereo ",self.distances)
                 else:
-                    slope1 = moving_avgs[1] - moving_avgs[0]
-                    slope2 = moving_avgs[2] - moving_avgs[1]
-                    avg_change = (slope1 + slope2) / 2
-                    new_distance = round(self.right_xcoords[4] + avg_change, 2)
-                    self.right_xcoords.append(new_distance)
-                    print()
-            self.right_xcoords.pop()
-        else:
-            self.right_xcoords.append(new_distance)
+                    self.replacements +=1
+                    if self.replacements <= 10:
+                        slope1 = mov_dist_avgs[14] - mov_dist_avgs[13]
+                        slope2 = mov_dist_avgs[15] - mov_dist_avgs[14]
+                        avg_change = (slope1 + slope2) / 2
+                        new_distance = float(round(self.distances[19] + avg_change,2))
+                        #print(new_distance)
+                        self.distances.append(new_distance)
+                        print("replaced ",self.distances)
+                    # else:
+                    #     distances = deque([])
+                    #     new_distance = stereo_Distance
+                    #     distances.append(new_distance)
+                self.distances.popleft()
+            else:
+                self.distances.append(new_distance)
+                print("populating... ",self.distances)
 
-        # print(self.right_xcoords)      # <<< Past five values
 
-        print("[PitchYaw]: Used Distance: ", new_distance)
-
-
-
-
-        # ******************************************************************* #
         # ** _________________ PITCH ANGLE: __________________ ** #
-        # Query table for angle at self.usedDistance
-        row = round((self.usedDistance - 0.99) / 2) - 2
-        if row < 0:
+        if new_distance <= 7.5:
             row = 0
-        elif row > 10:
-            row = 10
-        pitchAngle = self.pitchAngleTable[row, 1] + self.launcherAngle
+            pitchAngle = self.pitchAngleTable[row, 1] #+ self.launcherAngle
+        elif 7.5 < new_distance <= 12.5:
+            row = 1
+            pitchAngle = self.pitchAngleTable[row, 1]
+        elif 12.5 < new_distance <= 17.5:
+            row = 2
+            pitchAngle = self.pitchAngleTable[row, 1] 
+        elif 17.5 < new_distance <= 22.5:
+            row = 3
+            pitchAngle = self.pitchAngleTable[row, 1]
+        elif 22.5 < new_distance <= 35:
+            row = 4
+            pitchAngle = self.pitchAngleTable[row, 1]
+        else:
+            pitchAngle = 10
+
+#   ______________________________ YAW SMOOTHING/TRACKING  ______________________________ #
 
         self.latPixelDisp = (3280 - self.LeftXcoord - self.RightXcoord)
 
+        new_pix = self.latPixelDisp
 
-        # ''' PID CALCULATION:(scaled_pid_output_=0-1) (AT 25m: 1*1*255 = 255, AT 5m: 1*0.2 = 50)'''
+        if len(self.pixel_disps) == self.max_measures:
+            mov_pix_avgs = np.convolve(self.pixel_disps, np.ones((5)) / 5, mode='valid')
 
-        #        pid.update(self.latPixelDisp)
-        #        pid_output = pid.output  # MAXIMUM OUTPUT IS ROUGHLY: 400
-        #        scaled_pid = int((pid_output / 280) * 255)
-        #
-        #        if abs(scaled_pid) <= 10:
-        #            mapped_pid = 0
-        #        elif scaled_pid <= -100:
-        #            mapped_pid = -100
-        #        elif scaled_pid >= 100:
-        #            mapped_pid = 100
-        #        elif scaled_pid == 0:
-        #            mapped_pid = 0
-        #        elif scaled_pid > 0:
-        #            mapped_pid = np.interp(scaled_pid, [0, 100], [60, 160])
-        #        elif scaled_pid < 0:
-        #            mapped_pid = np.interp(scaled_pid, [-100, 0], [-160, -60])
-
-        motorSpeed = str(int(self.latPixelDisp))
+            if abs(new_pix - mov_pix_avgs[15]) <= 2000: # << REALLY LARGE SO IT WONT REALLY AFFECT ANYTHING YET
+                self.pix_replace = 0
+                self.pixel_disps.append(new_pix)
+            #                print("stereo ",self.distances)
+            else:
+                self.pix_replace += 1
+                if self.pix_replace <= 10:
+                    p_slope1 = mov_pix_avgs[15] - mov_pix_avgs[14]
+                    p_slope2 = mov_pix_avgs[14] - mov_pix_avgs[13]
+                    avg_pix_change = (p_slope1 + p_slope2) / 2
+                    new_pix = float(round(self.pixel_disps[19] + avg_pix_change, 2))
+                    # print(new_distance)
+                    self.pixel_disps.append(new_pix)
+                    print("replaced pixel disp: ", self.pixel_disps)
+                # else:
+                #     distances = deque([])
+                #     new_distance = stereo_Distance
+                #     distances.append(new_distance)
+            self.pixel_disps.popleft()
+        else:
+            self.pixel_disps.append(new_pix)
+            print("populating pixel disp: ... ", self.pixel_disps)
 
         # ** ___ SEND DATA ___ ** #
-        # self.UNO.reset_output_buffer()
-        data = '<' + str(motorSpeed) + ', ' + str(pitchAngle) + '>'
-        #        print("[PitchYaw]: UNO Data =  ",data,"  Pixel Disp = ", self.latPixelDisp)
+        if self.drillType == "Dynamic":
+            drill_type = "1"
+
+            ## "PREDICTION" FOR DYNAMIC
+            if self.launch_event.is_set():
+                if self.predictions <= 5:
+                    avg_displacement = sum(self.pixel_disps[9:19]) / 10
+                    if avg_displacement < 0:
+                        new_pix = - 3000
+                    elif avg_displacement > 0:
+                        new_pix = 3000
+                    self.predictions += 1
+                else:
+                    self.launch_event.clear()
+                    self.predictions = 0
+        else:
+            drill_type = "0"
+
+        data = '<' + str(new_pix) + ', ' + str(pitchAngle) + ',' + drill_type + '>'
+
+        #        print("[PitchYaw]: UNO Data =  ",data)
         if not self.Uno_write_lock.is_set():
             self.UNO.write(data.encode())
-
     #        if self.py_loop_count == 10:
-    #            print("[PitchYaw:Future] SENT: <motorSpeed, pitchAngle> =  " + data)
-    #        print("[motor_controller]:  ",1/(time.time() - start_time1))
+    #            print("[PitchYaw:Future] SENT: <pixelDisp, pitchAngle> =  " + data)
 
     def get_stereo(self):
-        # ___________________ GET stereoStack DATA ___________________ #
         cameradata = False
-
         while not cameradata and not self.kill_event.is_set() and not self.pause_event.is_set():
             try:
-                start_time2 = time.time()
+                # start_time2 = time.time()
                 try:
                     self.stereo_data_flag.set()  # <<<<< LETS STEREO KNOW TO ADD DATA TO QUEUE
-                    self.stereoData = self.get_stereo_data.get(timeout=1)
+                    self.stereoData = self.get_stereo_data.get(timeout=1.5)
                     # time1 = (time.time() - start_time2)
                 #                    if time1 > 0.15:
                 #                    print("[get_stereo]: 'get' from Queue: ",round(time1,2))
                 except Exception as e:
                     print("[PitchYaw]: getting stereo timed out (1s)", e)
+                    # STEREO TIMEOUT MEANS PLAYER IS NOT IN VEIW, THERFORE WE NEED TO SCAN THE FOV
+                    if self.drillType == "Dynamic":
+                        data = '<' + "-1" + ', ' + "10" + ',1>'
+                    else:
+                        data = '<' + "-1" + ', ' + "10" + ',0>'
+                    if not self.Uno_write_lock.is_set():
+                        self.UNO.write(data.encode())
                     continue
                 else:
                     tempData = "".join(self.stereoData)
@@ -330,19 +309,15 @@ SEND to STACKS:
                     tempData = tempData.split(",")
                     self.RightXcoord = int(float(tempData[0]))
                     self.LeftXcoord = int(float(tempData[1]))
-                    # self.stereoDist = float(tempData[2])
                     self.disparity = abs(self.LeftXcoord - self.RightXcoord)
                     if self.disparity == 0:
                         self.disparity = 1
                     self.stereoDist = round((self.focalsize * self.baseline) / (self.disparity * self.pixelsize), 2)
-                    #                    print("Left: ", self.LeftXcoord, " Right: ", self.RightXcoord," Dist: ", self.stereoDist)
-                    #                    print("[get_stereo]: strip/split: ",(time.time() - start_time2))
+                    # print("Left: ", self.LeftXcoord, " Right: ", self.RightXcoord," Dist: ", self.stereoDist)
                     # print("[PitchYaw]:  Distance  = ", self.stereoDist)
                     if self.pymain_stereo_flag.is_set():
                         self.stereo_py_main.put(tempData)
                         self.pymain_stereo_flag.clear()
-
-                    #                    print("[get_stereo]: 'put' to Queue ",(time.time() - start_time2))
                     cameradata = True
             except ValueError as verr:
                 print("[PitchYaw] : StereoData couldnt be converted" + str(verr))
@@ -366,28 +341,6 @@ SEND to STACKS:
             while self.pause_event.is_set():
                 time.sleep(1)
 
-                # ** ___________________ YAW MOTOR SPEED: ______________________ ** #
-
-    #                ster_time = (time.time() - start_time2)
-    #                if ster_time - time1 > 0.05:
-    #                    print("[get_stereo]:  ",round(ster_time,2))
-    #                print("[PitchYaw] Pixel Disp: ", self.latPixelDisp)
-
-    # def wait_for_begin(self):
-    # _____________ Get MEGA Data _____________
-
-    # MEGAdata = self.!!ChangetoJustVCQueue!!.peek()
-    # voiceCommand = MEGAdata.voicecommand
-    #
-    # while voiceCommand != "beginVC" and not self.kill_event.is_set():
-    #     try:
-    #         MEGAdata = self.!!ChangetoJustVCQueue!!.peek()
-    #         voiceCommand = MEGAdata.voicecommand  # voice commands = int(from 1 to 5)
-    #     except AttributeError as novoice:
-    #         print("[PitchYaw] : No VoiceCommand" + str(novoice))
-    #         time.sleep(0.5)
-    #     except Exception as e:
-    #         print("[PitchYaw] : Exception" + str(e))
 
     # def lateral_speed(self):
     #     ___________________ PLAYER SPEED DEQUE ___________________ #
@@ -410,22 +363,16 @@ SEND to STACKS:
                     time.sleep(1)
 
             try:
-                # Initialize Arduino UNO
+                # ___________ Initialize Arduino UNO ___________
                 uno_port = findUNO()
                 self.UNO = serial.Serial(uno_port, 115200, timeout=1)  # change ACM number as found from "ls /dev/tty*"
                 self.UNO.baudrate = 115200
 
-                # _________   ___ Get ACCELEROMETER Data  ____________ #
-
-                # tempAngle = GetUnoData(UNO, self.shutdown_event, self.kill_event)
-
                 # ___________ Get TEMPERATURE Data _______________
-
                 # temperature = self.getTemperatureStack.peek()
                 self.tempCorrection = 1  # temperature / 25  # <<<tempCorrection factor
 
                 # ___________ Get GUI Data _______________
-
                 guiData = self.guiData
                 self.drillType = guiData.drilltype
 
@@ -434,59 +381,43 @@ SEND to STACKS:
                 time.sleep(2)
                 continue
             else:
-                # print("[PitchYaw] : Received start data")
-                # if self.shutdown_event.is_set():
-                #     print("[PitchYaw] : STOP BUTTON PRESSED")
-                #     break
-                # else:
                 print("[PitchYaw] : UNO Connected... starting loop")
                 self.startData = True
 
-        # print("[PitchYaw] : Starting")
         if self.kill_event.is_set():
             self.shutdown_reset_function()
+        # WAIT TO ENSURE THAT ALL THE PROCESSES ARE STARTED
         time.sleep(5)
 
     def common_data(self):
         self.start_time = time.time()
-        if self.pause_event.is_set():
-            print("[Launcher] : Paused Drill")
-            while self.pause_event.is_set():
-                time.sleep(1)
-        #  print('[PitchYaw] : in common_data')
+        # if self.pause_event.is_set():
+        #     print("[Launcher] : Paused Drill")
+        #     while self.pause_event.is_set():
+        #         time.sleep(1)
         gpio_blinker(self.color, self.py_loop_count, self.working_on_the_Pi)
         self.py_loop_count = loop_counter(self.py_loop_count)
-        # print("in stereo")
 
         self.get_stereo()
-        # print("got stereo")
-        # self.wait_for_begin
-        # self.lateral_speed
 
-    #        FPS = time.time() - start_comm
-    #        print("[PitchYaw] ; common data FPS ", FPS)
-    #        return
-    # print("[PitchYaw] : completed 'common_data'")
 
     def dynamic_drill(self):
-        futureDist = False
-        while True and not self.kill_event.is_set():  # not self.shutdown_event.is_set() and not self.kill_event.is_set():
+        self.futureDist = False
+        finalDist = False
+        while not self.kill_event.is_set():
             # start_time = time.time()
-            # <<< BEGINNING OF PITCHYAW LOOP __________
             self.common_data()
-            # print('[PitchYaw] : done common_data        data = str(right_xcoord), ",", str(left_xcoord)  #, ",", str(distance)
-            #            start_time3 = time.time()
             try:  # Try for FUT_FINAL_DIST _______________
                 try:
-                    # FPS = time.time() - self.start_time
                     FUT_FINAL_DIST = self.future_dist_py.get_nowait()
                     if FUT_FINAL_DIST is not None:
-                        futureDist = True
+                        self.futureDist = True
                     else:
-                        futureDist = False
+                        self.futureDist = False
                 # Try for FINAL_DIST from Launcher(Thread) _______________
                 except:
-                    futureDist = False
+                    self.futureDist = False
+                    FUT_FINAL_DIST = None       # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
                     try:
                         FINAL_DIST = self.final_dist_py.get_nowait()
                         if FINAL_DIST is not None:
@@ -495,49 +426,19 @@ SEND to STACKS:
                             finalDist = False
                     except:
                         finalDist = False
-                        #                        print('[PitchYaw] : using stereo dist')
+                        FINAL_DIST = None       # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
                         pass
-
-                #                FPS = time.time() - start_time
-
-                #                    futureDist = False   # Try for FINAL_DIST from Launcher(Thread) _______________
-                #                    try:
-                #                        FINAL_DIST = self.final_dist_py.peek()
-                #                        if FINAL_DIST is not None:
-                #                            finalDist = True
-                #                        else:
-                #                            finalDist = False
-                #                    except:
-                #                        finalDist = False
-                # pass
 
                 # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
 
-                if futureDist:
-                    # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
+                if self.futureDist:      # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
                     self.usedDistance = FUT_FINAL_DIST
-                    #                    if not self.first_measure:  #
-                    #                        self.dist_deque.appendleft(self.usedDistance)
-                    #
-                    #                    if len(self.dist_deque) > self.avg_measure:
-                    #                        self.dist_deque.pop()
-
                     if self.usedDistance > 25.0:
                         self.usedDistance = 25.0
-                    FPS = time.time() - self.start_time
-                    #                    print("[PitchYaw] : drill b4 motor_controll ", FPS)
                     self.motor_controller()
-                    # FPS = time.time() - start_time
-                    # print("[PitchYaw] : drill after motor_controll ", FPS)                         # <<<<<SEND DATA TO MOTORS
-                    # time.sleep(0.1)
-                    #                self.endtime = time.time() - starttime
-
                 elif finalDist:
                     self.usedDistance = FINAL_DIST
-                    # FPS = time.time() - start_time
                     self.motor_controller()
-                    # FPS = time.time() - start_time
-
                 else:
                     try:
                         self.usedDistance = self.stereoDist
@@ -547,10 +448,8 @@ SEND to STACKS:
                         print(e)
                         self.shutdown_reset_function()
 
-
-
             except Exception as e:
-                print('[PitchYaw] : failed because of exception ', e)
+                print('[PitchYaw] : exception ', e)
                 continue
         #            else:
         #                print("[drill]:  ",1/(time.time() - start_time3))
@@ -586,11 +485,11 @@ SEND to STACKS:
                 self.motor_controller()  # <<<<<SEND DATA TO MOTORS
 
             except Exception as e:
-                print('[PitchYaw] : failed because of exception ' + e)
+                print('[PitchYaw] : failed because of exception ' , e)
                 continue
 
     def run(self):
-        print("[PitchYaw] : Starting")
+        print("[PitchYaw] : Starting ... ")
 
         self.startup()
 

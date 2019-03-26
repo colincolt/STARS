@@ -38,14 +38,8 @@ def loop_counter(loop_number):
     if loop_number >= 10:
         loop_number = 1
     return loop_number
-# _______PITCH AND YAW THREAD________ #
-
 
 def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pause_event):
-    # focalsize = 3.04e-03
-    # pixelsize = 1.12e-06
-    # baseline = 0.737
-    
     stereo_data = stereo_data
     GREEN = led_color
     working_on_the_Pi = pi_no_pi
@@ -53,7 +47,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     pause_event =pause_event
     show_camera = show_camera
 
-    TCP_IP = '169.254.116.12'
+    TCP_IP = '169.254.167.237'
     TCP_PORT = 5025
     BUFFER_SIZE = 128
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -74,7 +68,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
         jerseyLower2 = (175, 50, 50)  # currently set for red
         jerseyUpper2 = (180, 255, 255)
     elif LOCATION == "capstone pink":
-        jerseyLower = (160, 60, 60)
+        jerseyLower = (160, 80, 100)
         jerseyUpper = (170, 255, 255)
         
     pts = deque(maxlen=args["buffer"])
@@ -82,11 +76,9 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     frame_height = 256
     framerate = 20
     resolution = (frame_width, frame_height)
-    print("[Stereo] : trying to connected")
+    # print("[Stereo] : trying to connect")
     sys.stdout.flush()
 
-
-    # def send_receive():
 
     def receive_data():
         try:
@@ -99,22 +91,16 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
 
 
     def sendto_queue(left_xcoord,right_xcoord, start_time):
-        # disparity = abs(left_xcoord - right_xcoord)
-        # if disparity == 0:
-        #     disparity = 1
-        # distance = round((focalsize * baseline) / (disparity * pixelsize),2)
         if not pause_event.is_set():
             data = str(right_xcoord), ",", str(left_xcoord)  #, ",", str(distance)
             stereo_data.put(data)
         # fps = time.time() - start_time
 
-        # PixelDisp=(3280 - left_xcoord - right_xcoord)
-        # print("Left: ", left_xcoord, " Right: ", right_xcoord," Dist: ", distance, " Disparity: ", disparity)
-
     def connectClient():
         connected = False
         while not connected and not kill_event.is_set(): # and not shutdown_event.is_set() and not kill_event.is_set():  # Wait for client
             try:
+                print("[Stereo] Waiting for client")
                 s.bind((TCP_IP, TCP_PORT))
                 s.listen(1)
                 clientPort, addr = s.accept()
@@ -130,30 +116,26 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                 print('[Stereo] :       No Client' + str(e))
                 sys.stdout.flush()
                 time.sleep(3)
-
-
         if kill_event.is_set():
             sys.exit()
 
-    def ProcessLoop(kill_event):  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution):
+    def ProcessLoop(kill_event):
         stereo_loop_count = 1
         kill_event = kill_event
-        while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
+        while not kill_event.is_set():
             if pause_event.is_set():
                 print("[MainProcess] : PAUSE BUTTON PRESSED")
                 while pause_event.is_set():
                     time.sleep(1)
-                
+
             start_time = time.time()
+
             if working_on_the_Pi:
                 gpio_blinker(GREEN, stereo_loop_count)
 
             stereo_loop_count = loop_counter(stereo_loop_count)
-
             image = vs.read()
             image = imutils.resize(image, width=frame_width)
-
-
             blurred = cv2.GaussianBlur(image, (11, 11), 0)
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
@@ -166,11 +148,8 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                 
             mask = cv2.erode(mask, None, iterations=2)
             mask = cv2.dilate(mask, None, iterations=2)
-
-            # find contours in the mask and initialize the current (x, y) center of the ball
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
-            center = None
 
             if len(cnts) > 0:
                 c = max(cnts, key=cv2.contourArea)
@@ -183,38 +162,34 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                     ((x, y), radius) = cv2.minEnclosingCircle(c)
 
                     if radius > 0.5:
-                        # draw the circle and centroid on the frame, then update the list of tracked points
                         cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
                         cv2.circle(image, center, 5, (0, 0, 255), -1)
 
-                    cv2.imshow("Frame", image)  #  mask
-                    key = cv2.waitKey(1) & 0xFF
-
-                right_xcoords = receive_data()
-                right_xcoords = right_xcoords.split('<')
-                right_xcoord = right_xcoords[1]
-                #print(right_xcoord)
-                fps = time.time() - start_time
-
+                    cv2.imshow("Frame", mask)  #  mask
+                    cv2.waitKey(1) & 0xFF
                 try:
-                    right_xcoord = int(right_xcoord)
-                    left_xcoord = int(centroid[0])
-                    sendto_queue(left_xcoord,right_xcoord,start_time)
-#                    print("left x:  ",left_xcoord, "  right x:  ", right_xcoord)
-#                    disparity = abs(left_xcoord-right_xcoord)
-#                    distance = (focalsize*baseline)/(disparity*pixelsize)
-#                    print("distance: ", distance)
+                    right_xcoords = receive_data()
+                    right_xcoords = right_xcoords.split('<')
+                    right_xcoord = right_xcoords[1]
+                except IndexError as i:
+                    print(right_xcoords, i)
+                else:
+                    try:
+                        right_xcoord = int(right_xcoord)
+                        left_xcoord = int(centroid[0])
+                        sendto_queue(left_xcoord,right_xcoord,start_time)
+                        #print("left x:  ",left_xcoord, "  right x:  ", right_xcoord)
+                    except ValueError as val:
+                        # print("Value Error:  ->  ",val)
+                        pass
 
-                except ValueError as val:
-                    # print("Value Error:  ->  ",val)
-                    pass
+                # fps = time.time() - start_time
 
         if kill_event.is_set():
             print("[Stereo] : closing socket connection")
-            PiVideoStream().stop()
+            PiVideoStream(kill_event).stop()
             clientPort.close()
-            #            clientPort.shutdown()
-
+            # clientPort.shutdown()
             print('[Stereo] : Closing Camera...')
 
 
@@ -239,8 +214,8 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
 
         def update(self):
             # keep looping infinitely until the thread is stopped
-            # while not kill_event.is_set(): #not shutdown_event.is_set() and not kill_event.is_set():
-                for f in self.stream:
+            for f in self.stream:
+                try:
                     # grab the frame from the stream and clear the stream in
                     # preparation for the next frame
                     self.frame = f.array
@@ -254,13 +229,13 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
                         self.camera.close()
                         time.sleep(3)
                         return
+                except Exception as camera_close:
+                    print("This will likely catch the camera closing error ------>>   ",camera_close)
 
         def read(self):
-            # return the frame most recently read
             return self.frame
 
         def stop(self):
-            # indicate that the thread should be stopped
             self.stopped = True
 
     print("[Stereo] starting THREADED frames from `picamera` module...")
@@ -275,8 +250,8 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     else:
         print("[Stereo] : Initializing camera")
         sys.stdout.flush()
-        time.sleep(2.0)  # < Let Video Thread startup
-        ProcessLoop(kill_event)  # vs, clientPort, BUFFER_SIZE, frame_width, frame_height, resolution)
+        time.sleep(2.0)         # < Let Video Thread startup
+        ProcessLoop(kill_event)
 
 
 if __name__ == "__main__":
@@ -290,9 +265,10 @@ if __name__ == "__main__":
     working_on_the_Pi = True
     if working_on_the_Pi:
         GREEN = LED(16)
-
+        
     mp.Process(target=Stereoscopics, args=[stereo_data, working_on_the_Pi, GREEN, kill_event,show_camera,pause_event]).start()
 
+    print("continuing")
     while True:
         data = stereo_data.get()
         tempData="".join(data)
@@ -301,12 +277,16 @@ if __name__ == "__main__":
         tempData = tempData.split(",")
         RightXcoord = int(float(tempData[0]))
         LeftXcoord = int(float(tempData[1]))
-        stereoDist = float(tempData[2])
 
-#        print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
-
-
-
-
+        focalsize = 3.04e-03
+        pixelsize = 1.12e-06
+        baseline = 0.737
+        
+        disparity =   LeftXcoord - RightXcoord
+        print(disparity)
+        stereoDist = round((focalsize * baseline) / (disparity * pixelsize), 2)
+        
+        
+        print("RightXcoord:  ",RightXcoord,"  LeftXcoord:  ", LeftXcoord,"  stereoDist:  ",stereoDist)
 
 

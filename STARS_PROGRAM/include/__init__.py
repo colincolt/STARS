@@ -1,1 +1,1 @@
-# File is empty but lets the main program know to include this folder
+# THIS IS AN EMPTY FILE THAT POINTS THE MAIN PROGRAM TO THIS FOLDER
