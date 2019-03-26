@@ -183,7 +183,7 @@ SEND to STACKS:
 - sendfinalDistStack
 - sendTemperatureStack'''
 
-    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset, launch_event,voice_cont):
+    def __init__(self, gui_data, send_mega_data, get_final_dist, get_future_dist, pi_no_pi, led_color, kill_event, pause_event, py_reset, launch_event,voice_cont, drill_results, player_name):
         super(Launcher, self).__init__()
         self.send_mega_data = send_mega_data
         self.gui_data = gui_data
@@ -196,6 +196,8 @@ SEND to STACKS:
         self.py_reset = py_reset
         self.launch_event = launch_event
         self.voice_control = voice_cont
+        self.drill_result = drill_results
+        self.player = player_name
         if self.working_on_the_Pi:
             self.color = led_color
 
@@ -420,6 +422,7 @@ SEND to STACKS:
             self.send_flag.set()
             while self.send_flag.is_set():
                 time.sleep(0.1)
+
             time.sleep(2)
 
         if self.drillType == "Dynamic":
@@ -488,6 +491,8 @@ SEND to STACKS:
                 # _____________________WAIT FOR VOICE COMMAND and TEMP TO BEGIN DRILL _____________________
                 if self.voice_control.is_set():
                     self.wait_for_voice()
+                else:
+                    time.sleep(3)
 
                 # ****SET TEMPERATURE CORRECTION FACTOR*****
                 self.tempCorrect = 1  # self.temperature / 25
@@ -531,7 +536,7 @@ SEND to STACKS:
     def dynamic_drill(self):
         # self.wait_for_voice()
         self.WAIT_TIME = self.DYNAMIC_WAIT_TIME
-        print("[Launcher] : Beginning Drill")
+        print("[Launcher] : Beginning Drill ________________________")
         self.first_launch = True
 
         while self.drillCount <= 5 and not self.kill_event.is_set():
@@ -649,20 +654,18 @@ SEND to STACKS:
 
 
     def output_to_excel(self):
-        filename = "demo_wb.xlsx"
-        self.player = "Player2"
-        ball = [0, 0, 0, 0, 0, 0]
+        filename = "/home/pi/Desktop/demo_wb.xlsx"
 
         try:
             wb = load_workbook(filename=filename)
             print("[Launcher]: file exists")
-            new_book = False
+            # new_book = False
         except Exception as e:
             print("[Launcher]: file not found, making new book ")
             wb = Workbook()
             summary_sheet = wb.get_sheet_by_name('Sheet')
             summary_sheet.title = 'Summary'
-            new_book = True
+            # new_book = True
 
         try:
             players_sheet = wb[self.player]
@@ -696,9 +699,7 @@ SEND to STACKS:
                 drill += 1
 
         wb.save(filename)
-
         # PLOT THE DATA:
-        # player_sheets =
         data_ranges = [0] * (len(wb.worksheets) - 1)
 
         series = [0] * (len(wb.worksheets) - 1)
@@ -708,7 +709,6 @@ SEND to STACKS:
             gathered = False
             coll = 1
             roww = 1
-            drill = 1
             chart = ScatterChart()
             charts = [chart] * (len(wb.worksheets) - 1)
             charts[i].title = str(self.player) + "'s  Results"
@@ -718,12 +718,9 @@ SEND to STACKS:
                 if wb.worksheets[i + 1].cell(column=coll, row=roww + 1).value is None:
                     gathered = True
                 else:
-                    # print(wb.worksheets[i+1].cell(column=coll,row=roww+1).value)
                     roww += 5
-                    # print("checking row: ",roww)
                     gathered = False
 
-            # roww +=4
             data_ranges[i] = Reference(wb.worksheets[i + 1], min_col=3, min_row=1, max_row=roww)
 
             x_vals = Reference(wb.worksheets[i + 1], min_col=2, min_row=1, max_row=roww)
@@ -761,22 +758,24 @@ SEND to STACKS:
         wb.save(filename)
 
     def display_results(self):
-        ball = [0,0,0,0,0,0]
-        app = App(title="Results", layout="auto", height=320, width=480, bg="#424242", visible=True)
-        title = Text(app, str(self.player) + "'s Results for " + str(self.drillType), size=20, font="Calibri Bold", color="white")
-        subt = "Pass Difficulty: " + str(self.difficulty) + "  |  Ball Speed: " + str(self.drillSpeed)
-        subtitle = Text(app, subt, size=14, font="Calibri Bold", color="white")
-        spacer = Box(app, width=20, height=20)
-
-        for i in range(5):
-
-            ball[i + 1] = "Pass # " + str(i + 1) + ":   " + str((self.targetTimes[i + 1]) / 1000) + " sec  |  " + str(
-                self.ballSpeeds[i + 1]) + " m/s"
-            # if len(ball[i + 1]) != 25:
-            # ball[i+1] += "0"
-            Text(app, ball[i + 1], size=12, font="Calibri Bold", color="white")
-
-        app.display()
+        results = self.targetTimes + self.ballSpeeds
+        self.drill_result.put(results)
+        # ball = [0,0,0,0,0,0]
+        # app = App(title="Results", layout="auto", height=320, width=480, bg="#424242", visible=True)
+        # title = Text(app, str(self.player) + "'s Results for " + str(self.drillType), size=20, font="Calibri Bold", color="white")
+        # subt = "Pass Difficulty: " + str(self.difficulty) + "  |  Ball Speed: " + str(self.drillSpeed)
+        # subtitle = Text(app, subt, size=14, font="Calibri Bold", color="white")
+        # spacer = Box(app, width=20, height=20)
+        #
+        # for i in range(5):
+        #
+        #     ball[i + 1] = "Pass # " + str(i + 1) + ":   " + str((self.targetTimes[i + 1]) / 1000) + " sec  |  " + str(
+        #         self.ballSpeeds[i + 1]) + " m/s"
+        #     # if len(ball[i + 1]) != 25:
+        #     # ball[i+1] += "0"
+        #     Text(app, ball[i + 1], size=12, font="Calibri Bold", color="white")
+        #
+        # app.display()
 
     def close_drill(self):
         print("[Launcher] : Drill Ending  ")

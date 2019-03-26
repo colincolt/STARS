@@ -150,7 +150,7 @@ def Lidar1Dist(evo):
 #   futureDistStack
 #
 class startMainFile():
-    def __init__(self,speed, difficulty, drillType, pause_event, kill_event, PitchYawStart, LauncherStart, EvoStart,show_camera,voice_con):
+    def __init__(self,speed, difficulty, drillType, pause_event, kill_event, PitchYawStart, LauncherStart, EvoStart,show_camera,voice_con,drill_results,player_select):
         super(startMainFile,self).__init__()
         # # _______________________________Main Processing_____________________________________
         # PACKAGES:
@@ -189,6 +189,8 @@ class startMainFile():
         self.kill_event = kill_event
         self.pause_event = pause_event
         self.voice_control = voice_con
+        self.results = drill_results
+        self.player_choice = player_select
         self.py_reset_event = mp.Event()
         self.pymain_stereo_flag = mp.Event()
         self.mega_send_flag = mp.Event()
@@ -445,7 +447,7 @@ class startMainFile():
         if self.StartLauncher:
             try:
                 Launch = launcher.Launcher(self.guiData, self.mega_data, self.final_dist_l, self.future_dist_l, working_on_the_Pi, WHITE,
-                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control)
+                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control, self.results,self.player_choice)
                 self.processes.append(Launch)
                 if working_on_the_Pi:
                     RED_3.on()

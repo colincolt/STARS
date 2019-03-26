@@ -5,8 +5,13 @@ from openpyxl.chart import (
     Reference,
     Series,
 )
+from tkinter import *
+
 from guizero import App, Text, Box
 import time
+import easygui
+from multiprocessing import Queue
+# import outputfile
 
 
 targetTimes = [3000, 4500, 2960, 6200, 5754, 7430]
@@ -17,7 +22,18 @@ difficulty = 1
 drillSpeed = 1
 drillType = "Dynamic"
 ball=[0,0,0,0,0,0]
+data = Queue()
 
+# result = targetTimes + ballSpeeds
+# print(result)
+# data.put(result)
+#
+# out = data.get()
+# print(out)
+# outputfile.OutPut(targetTimes,ballSpeeds, player).run()
+#
+# while True:
+#     print("Hello")
 try:
     wb = load_workbook(filename=filename)
     print("[Launcher]: file exists")
@@ -64,7 +80,7 @@ wb.save(filename)
 
 # PLOT THE DATA:
 # player_sheets =
-data_ranges = [0]*(len(wb.worksheets)-1)
+time_ranges = [0]*(len(wb.worksheets)-1)
 
 series = [0]*(len(wb.worksheets)-1)
 
@@ -90,11 +106,11 @@ for i in range((len(wb.worksheets)-1)):
             gathered = False
 
     # roww +=4
-    data_ranges[i]=Reference(wb.worksheets[i+1],min_col=3,min_row=1,max_row=roww)
+    time_ranges[i]=Reference(wb.worksheets[i+1],min_col=3,min_row=1,max_row=roww)
 
     x_vals = Reference(wb.worksheets[i+1],min_col=2,min_row=1,max_row=roww)
 
-    series[i]=Series(data_ranges[i],xvalues=x_vals,title_from_data=True)
+    series[i]=Series(time_ranges[i],xvalues=x_vals,title_from_data=True)
 
     # chart.add_data(data_ranges[i],titles_from_data=True)
     charts[i].append(series[i])
@@ -127,6 +143,44 @@ for i in range((len(wb.worksheets)-1)):
 
 
 wb.save(filename)
+
+# for i in range(5):
+#     ball[i+1] = "Pass # " + str(i + 1) + ":   " + str((targetTimes[i + 1]) / 1000) + " sec  |  " + str(ballSpeeds[i + 1]) + " m/s"
+#
+# results = Tk()
+# var1 = StringVar()
+# var2 = StringVar()
+# var3 = StringVar()
+# var4 = StringVar()
+# var5 = StringVar()
+#
+#
+# ball_1 = Message( results, width=500, textvariable = var1 )
+# ball_2 = Message( results, width=500, textvariable = var2)
+# ball_3 = Message( results, width=500, textvariable = var3)
+# ball_4 = Message( results, width=500, textvariable = var4)
+# ball_5 = Message( results, width=500, textvariable = var5)
+#
+#
+# var1.set(ball[1])
+# var2.set(ball[2])
+# var3.set(ball[3])
+# var4.set(ball[4])
+# var5.set(ball[5])
+#
+# ball_1.pack()
+# ball_2.pack()
+# ball_3.pack()
+# ball_4.pack()
+# ball_5.pack()
+#
+#
+# results.mainloop()
+#
+#
+# easygui.msgbox(ball[1]+
+#                ball[2])
+
 
 app = App(title="Results", layout="auto", height=320, width=480, bg="#424242",visible=True)
 title = Text(app,str(player)+"'s Results for "+str(drillType),size=20,font="Calibri Bold", color="white")
