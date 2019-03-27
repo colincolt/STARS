@@ -6,8 +6,10 @@ import numpy as np
 import time
 
 
-def return_data(distance):
+def return_data(distance, left_curve, right_curve):
 
+    curve_left = left_curve
+    curve_right = right_curve
     used_distance=int(distance)
 
     difficulty = "1"
@@ -58,16 +60,28 @@ def return_data(distance):
         RPS = RPM / 60
         PERIOD = (1 / RPS) * (1000000)
         print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-    
-    
+
+    if curve_left:
+        PERIOD1 = PERIOD - 3000
+        PERIOD2 = PERIOD
+    elif curve_right:
+        PERIOD1 = PERIOD
+        PERIOD2 = PERIOD - 3000
+    else:  ## NEEDS SCALING
+        PERIOD1 = PERIOD
+        PERIOD2 = PERIOD
+
+    motor_period1 = str(int(PERIOD1))
+    motor_period2 = str(int(PERIOD2))
+
     targetChoice = int(random.choice([1, 2 , 3, 4]))
     estimated_tof = (0.120617 * used_distance) * 1000  # + difficulty_time
     estimated_tof = round(estimated_tof, 2)
-    motor_speed = str(int(PERIOD))
+    # motor_speed = str(int(PERIOD))
     drill_type = "0"
 
     #
-    mega_data = '<' + motor_speed + ',' + motor_speed + ',' + str(targetChoice) + ',' + str(
+    mega_data = '<' + motor_period1 + ',' + motor_period2 + ',' + str(targetChoice) + ',' + str(
         difficulty) + ',' + ballfeed + ',' + str(estimated_tof) + ','+drill_type+'>'
 
     # Query table for angle at self.usedDistance

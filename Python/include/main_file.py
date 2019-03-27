@@ -87,16 +87,9 @@ else:
     GREEN = 16
     BLUE = 20
     WHITE = 19
-
-
-
 # GLOBAL VARIABLES:
 global loop_count
 loop_count = 1
-
-global startMarker
-startMarker = '<'
-
 
 def gpio_blinker(color):
     global loop_count
@@ -106,13 +99,11 @@ def gpio_blinker(color):
         else:
             color.off()
 
-
 def loop_counter(loop_number):
     loop_number += 1
     if loop_number >= 10:
         loop_number = 1
     return loop_number
-
 
 def findEvo():
     ports = list(serial.tools.list_ports.comports())
@@ -120,7 +111,6 @@ def findEvo():
         if "5740" in p[2]:
             return (p[0])
     return ('NULL')
-
 
 def Lidar1Dist(evo):
     while (1):
@@ -141,28 +131,21 @@ def Lidar1Dist(evo):
             return None
 
 
-# startMainFile STACK IO
-# RECEIVE from STACKS:
-#   stereoQueue
-#   megaDataQueue
-# SEND to STACKS:
-#   finalDistStack
-#   futureDistStack
-#
 class startMainFile():
+    ''' MAINFILE STACK IO
+    RECEIVE:
+      stereoQueue
+      megaDataQueue
+    SEND:
+      finalDistStack
+      futureDistStack
+    '''
     def __init__(self,speed, difficulty, drillType, pause_event, kill_event, PitchYawStart, LauncherStart, EvoStart,show_camera,voice_con,drill_results,player_select):
         super(startMainFile,self).__init__()
-        # # _______________________________Main Processing_____________________________________
-        # PACKAGES:
         # __ VARIABLES _____#
-        self.avg_measures = 10
-        self.lead_time = 3
         self.focalsize = 3.04e-03
         self.pixelsize = 1.12e-06
         self.baseline = 0.737
-        # TRACKING LISTS
-        self.z_dist_deque = deque([])
-        self.measure_time_deque = deque([])
 
         # COMMUNICATION
         self.stereo_data = mp.Queue()
@@ -172,16 +155,26 @@ class startMainFile():
         self.final_dist_l = mp.Queue()
         self.future_dist_py = mp.Queue()
         self.final_dist_py = mp.Queue()
+        # SIGNALING
         self.data_flag = mp.Event()
         self.launch_event = mp.Event()
+        self.py_reset_event = mp.Event()
+        self.pymain_stereo_flag = mp.Event()
+        self.mega_send_flag = mp.Event()
+        # *** DATA TUNING PARAMETERS *** #
+        self.max_measures = 20
+        self.replacements = 0
+        self.distances = deque([])
+        self.times = deque([])
+        self.first_measurement = True
+        self.player_running = False
         self.processes = []
-
         # __ GUI Input __ #
         self.guiData = data_object
         self.guiData.speed = speed
         self.guiData.difficulty = difficulty
         self.guiData.drilltype = drillType
-
+        # INITIALIZATION DATA
         self.show_camera = show_camera
         self.StartPitchYaw = PitchYawStart
         self.StartLauncher = LauncherStart
@@ -191,19 +184,6 @@ class startMainFile():
         self.voice_control = voice_con
         self.results = drill_results
         self.player_choice = player_select
-        self.py_reset_event = mp.Event()
-        self.pymain_stereo_flag = mp.Event()
-        self.mega_send_flag = mp.Event()
-
-        # *** DATA TUNING PARAMETERS *** #
-        self.max_measures = 20
-    #    global first_new
-        self.replacements = 0
-        self.distances = deque([])
-        self.times = deque([])
-        self.first_measurement = True
-
-        self.player_running = False
 
     def shutdown_func(self):
         print("[MainProcess] : EXIT BUTTON PRESSED")
@@ -231,18 +211,12 @@ class startMainFile():
 
     def get_distances(self):
         rationaleDistMeasures = 0
-        # Get(WAIT) for stereoDistance _____________________________
         stereo = False
         while not stereo and not self.kill_event.is_set():
-            # if self.pause_event.is_set():
-            #     print("[MainProcess] : PAUSE BUTTON PRESSED")
-            #     while self.pause_event.is_set():
-            #         time.sleep(1)
             if self.kill_event.is_set():
                 self.shutdown_func()
             try:
                 self.pymain_stereo_flag.set()
-                # print("Main: flag is set")
                 tempData = self.stereo_py_main.get(timeout=0.2)
                 RightXcoord = int(float(tempData[0]))
                 LeftXcoord = int(float(tempData[1]))
@@ -250,13 +224,13 @@ class startMainFile():
                 if disparity == 0:
                     disparity = 1
                 stereo_Distance = round((self.focalsize * self.baseline) / (disparity * self.pixelsize), 2)
-#                print("[MainProcess] : Distance =  ", stereo_Distance)
+                # print("[MainProcess] : Distance =  ", stereo_Distance)
             except AttributeError as att:
-#                print("[MainProcess] : No data in stereoStack" + str(att))
+                # print("[MainProcess] : No data in stereoStack" + str(att))
                 continue
 
             except Exception as q:
-#                print("[MainProcess] : No data in stereoStack" + str(q))
+                # print("[MainProcess] : No data in stereoStack" + str(q))
                 continue
             else:
                 try:
@@ -264,7 +238,6 @@ class startMainFile():
                         # ************ NEW DATA SMOOTHER (MAY NEED TUNING) ***************** #
                         first_new = False
                         new_distance = stereo_Distance
-#                        print("in dist check",new_distance)
                         if not self.first_measurement:
                             self.read_time = time.time() - self.reading_time
                             self.times.append(self.read_time)
@@ -275,18 +248,17 @@ class startMainFile():
 
                         try:
                             if len(self.distances) == self.max_measures:
-#                                print("in if")
                                 moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
-                                
+
                                 if abs(new_distance - moving_avgs[15]) <= 2.0:
                                     self.distances.append(new_distance)
                                     self.replacements = 0
-#                                    print("stereo",self.distances)
+                                    # print("stereo",self.distances)
                                     first_new = True
                                 else:
                                     if first_new:
                                         self.distances.append(new_distance)
-#                                        print("2",self.distances)
+                                        # print("2",self.distances)
                                     else:
                                         self.replacements +=1
                                         if self.replacements <= 10:
@@ -294,9 +266,9 @@ class startMainFile():
                                             slope2 = moving_avgs[15] - moving_avgs[14]
                                             avg_change = (slope1 + slope2) / 2
                                             new_distance = float(round(self.distances[19] + avg_change,2))
-#                                            print(new_distance)
+                                            # print(new_distance)
                                             self.distances.append(new_distance)
-#                                            print("replaced",self.distances)
+                                            # print("replaced",self.distances)
 
                                             # DETECT RUNNiNG PLAYER:
                                             if moving_avgs[15] - moving_avgs[0] > 3:
@@ -304,32 +276,19 @@ class startMainFile():
                                                 self.player_speed = (moving_avgs[15] - moving_avgs[0])/sum(self.times[2:17])
                                             else:
                                                 self.player_running = False
-#                                        else:
-##                                            self.distances = deque([])
-#                                            new_distance = stereo_Distance
-#                                            self.distances.append(new_distance)
                                 self.distances.popleft()
                             else:
-#                                print("in else check")
                                 self.distances.append(new_distance)
-#                                print("populating",self.distances)
-
+                                # print("populating",self.distances)
 
                         except Exception as e:
                             print("issue here",e)
                         else:
-                            #print(len(moving_avgs))
-                            #print("[Mainfile]: Past Five Distances: ", self.distances)
-                            #print("[Mainfile]: Used Distance: ", new_distance)
-                            # ******************************************************************* #
-#                            print("at the end")
-
-
                             rationaleDistMeasures = 1.0
                             distanceTotal = new_distance
                             FINAL_DIST = float(round(distanceTotal / rationaleDistMeasures, 2))
                             stereo = True
-#                            print("[MainFile]: FINAL DISTANCE CALC =  ", FINAL_DIST)
+                            # print("[MainFile]: FINAL DISTANCE CALC =  ", FINAL_DIST)
                             return FINAL_DIST
                     else:
                         print("[MainFile] stereo_Distance not in range (1-35)")
@@ -371,13 +330,12 @@ class startMainFile():
         if len(self.distances) == self.max_measures:
             moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
             future_distance = self.distances[19]
-
-
             return future_distance
         else:
             return None
 
     def run(self):
+#        print("[MAINFILE]: PLAYER ", self.player_choice)
         if working_on_the_Pi:
             RED_1.off()
             RED_2.off()
@@ -386,7 +344,7 @@ class startMainFile():
         global loop_count
         print("------------------------------")
         print("")
-        print("[MainProcess] : BEGINNING NEW DRILL :")
+        print("[MainProcess] : WELCOME ",self.player_choice,", BEGINNING NEW DRILL :")
         print("Speed:  " + str(self.guiData.speed) + "  " + "Diff:  " + str(
             self.guiData.difficulty) + "  " + "Drill:  " + self.guiData.drilltype)
         print("")
@@ -475,11 +433,6 @@ class startMainFile():
         self.replacements = 0
         while not self.kill_event.is_set():
 
-            # if self.pause_event.is_set():
-            #     print("[MainProcess] : PAUSE BUTTON PRESSED")
-            #     while self.pause_event.is_set():
-            #         time.sleep(1)
-
             if self.guiData.drilltype == "Dynamic":
 # _________________ PREDICTIVE TRACKING DRILL _________________  #
                 if working_on_the_Pi:
@@ -487,9 +440,7 @@ class startMainFile():
                         BLUE.on()
                     else:
                         BLUE.off()
-
                 loop_count += 1
-
                 if loop_count == 100:
                     loop_count = 1
 
@@ -519,9 +470,7 @@ class startMainFile():
                         BLUE.on()
                     else:
                         BLUE.off()
-
                 loop_count += 1
-
                 if loop_count == 100:
                     loop_count = 1
 
@@ -542,9 +491,7 @@ class startMainFile():
                         BLUE.on()
                     else:
                         BLUE.off()
-
                 loop_count += 1
-
                 if loop_count == 100:
                     loop_count = 1
 
@@ -558,14 +505,12 @@ class startMainFile():
                 except:
                     print("[MainProcess] : Waiting for FINAL distance")
                     continue
-
             else:
                 print("[MainProcess] : no GUI data")
                 time.sleep(1)
 
         if self.kill_event.is_set():
             self.shutdown_func()
-
             sys.exit()
         else:
             print("[MainProcess] : Not sure what went wrong")

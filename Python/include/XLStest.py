@@ -79,41 +79,49 @@ while not data_printed:
 wb.save(filename)
 
 # PLOT THE DATA:
-# player_sheets =
-time_ranges = [0]*(len(wb.worksheets)-1)
+ranges = [0]*(len(wb.worksheets)-1)
+speed_ranges = [0]*(len(wb.worksheets)-1)
+series = [0]*20
+speed_series = [0]*(len(wb.worksheets)-1)
 
-series = [0]*(len(wb.worksheets)-1)
+chart1 = ScatterChart()
+chart2 = ScatterChart()
+chart3 = ScatterChart()
+chart4 = ScatterChart()
+chart5 = ScatterChart()
+speed_chart1 = ScatterChart()
+speed_chart2 = ScatterChart()
+speed_chart3 = ScatterChart()
+speed_chart4 = ScatterChart()
+speed_chart5 = ScatterChart()
+
+charts = [chart1,chart2,chart3,chart4,chart5]
+speed_charts = [speed_chart1,speed_chart2,speed_chart3,speed_chart4,speed_chart5]
+# otherchart = ScatterChart()
+# speed_charts = [otherchart] * (len(wb.worksheets) - 1)
 
 for i in range((len(wb.worksheets)-1)):
-    print(str(wb.worksheets[i])[11:20])
+    print(str(wb.worksheets[i+1])[11:20])
     gathered = False
     coll=1
     roww=1
     drill=1
-    chart = ScatterChart()
-    charts=[chart]*(len(wb.worksheets)-1)
-    charts[i].title = str(player)+"'s  Results"
-
+    charts[i].title = str(wb.worksheets[i+1])[12:19]+"'s  Results"
+    speed_charts[i].title = str(wb.worksheets[i+1])[12:19]+"'s  Results"
 
     while not gathered:
         print("Gathering..")
         if wb.worksheets[i+1].cell(column=coll,row=roww+1).value is None:
             gathered = True
         else:
-            # print(wb.worksheets[i+1].cell(column=coll,row=roww+1).value)
             roww+=5
-            # print("checking row: ",roww)
             gathered = False
 
-    # roww +=4
-    time_ranges[i]=Reference(wb.worksheets[i+1],min_col=3,min_row=1,max_row=roww)
-
+    ranges[i] = Reference(wb.worksheets[i+1],min_col=3,min_row=1,max_col=3,max_row=roww)
     x_vals = Reference(wb.worksheets[i+1],min_col=2,min_row=1,max_row=roww)
+    series[i]=Series(values=ranges[i],xvalues=x_vals,title_from_data=True)
+    charts[i].append(series[0])
 
-    series[i]=Series(time_ranges[i],xvalues=x_vals,title_from_data=True)
-
-    # chart.add_data(data_ranges[i],titles_from_data=True)
-    charts[i].append(series[i])
     charts[i].x_axis.title = "Test Number"
     charts[i].x_axis.scaling.min = 0
     charts[i].x_axis.scaling.max = roww
@@ -127,22 +135,77 @@ for i in range((len(wb.worksheets)-1)):
 
     s1.graphicalProperties.line.noFill = True
 
-    # s2 = chart.series[1]
-    # s2.marker.symbol = "circle"
-    # s2.marker.graphicalProperties.solidFill = "FF0000"  # Marker filling
-    # s2.marker.graphicalProperties.line.solidFill = "FF0000"  # Marker outline
-    #
-    # s2.graphicalProperties.line.noFill = True
+    speed_ranges[i] = Reference(wb.worksheets[i + 1], min_col=4, min_row=1, max_col=4, max_row=roww)
+    x_value = Reference(wb.worksheets[i + 1], min_col=2, min_row=1, max_row=roww)
+    series[i+10] = Series(values=speed_ranges[i], xvalues=x_value, title_from_data=True)
+    speed_charts[i].append(series[i+10])
+
+    speed_charts[i].x_axis.title = "Test Number"
+    speed_charts[i].x_axis.scaling.min = 0
+    speed_charts[i].x_axis.scaling.max = roww
+    speed_charts[i].y_axis.title = "Ball Speeds (m/s)"
+    speed_charts[i].legend = None
+
+    s2 = speed_charts[i].series[0]
+    s2.marker.symbol = "circle"
+    s2.marker.graphicalProperties.solidFill = "006868"  # Marker filling
+    s2.marker.graphicalProperties.line.solidFill = "006868"  # Marker outline
+
+    s2.graphicalProperties.line.noFill = True
 
     charts[i].style = 13
     wb.worksheets[0].add_chart(charts[i], "A"+str(i+1 +15*i))
-
-    # chart.y_axis.title =
+    speed_charts[i].style = 13
+    wb.worksheets[0].add_chart(speed_charts[i], "J" + str(i + 1 + 15 * i))
 # Style the lines
-
-
-
 wb.save(filename)
+
+# speed_ranges = [0]*(len(wb.worksheets)-1)
+# listSpeeds = [0]*(len(wb.worksheets)-1)
+# otherchart = ScatterChart()
+# speed_charts = [otherchart] * (len(wb.worksheets) - 1)
+
+# for i in range((len(wb.worksheets)-1)):
+#     gathered = False
+#     coll = 1
+#     roww = 1
+#     drill = 1
+#
+#     speed_charts[i].title = str(player) + "'s  Results"
+#
+#     while not gathered:
+#         print("Gathering..")
+#         if wb.worksheets[i + 1].cell(column=coll, row=roww + 1).value is None:
+#             gathered = True
+#         else:
+#             roww += 5
+#             gathered = False
+#
+#     speed_ranges[i] = Reference(wb.worksheets[i + 1], min_col=4, min_row=1,max_row=roww)
+#     print(speed_ranges[i])
+#     x_vals = Reference(wb.worksheets[i + 1], min_col=2, min_row=1, max_row=roww)
+#
+#     listSpeeds[i] = Series(values=speed_ranges[i], xvalues=x_vals, title_from_data=True)
+#
+#     # print(listSpeeds[i])
+#     speed_charts[i].append(listSpeeds[0])
+#     speed_charts[i].x_axis.title = "Test Number"
+#     speed_charts[i].x_axis.scaling.min = 0
+#     speed_charts[i].x_axis.scaling.max = roww
+#     speed_charts[i].y_axis.title = "Ball Speeds (m/s)"
+#     speed_charts[i].legend = None
+#
+#     s2 = speed_charts[i].listSpeeds[0]
+#     s2.marker.symbol = "circle"
+#     s2.marker.graphicalProperties.solidFill = "006868"  # Marker filling
+#     s2.marker.graphicalProperties.line.solidFill = "006868"  # Marker outline
+#
+#     s2.graphicalProperties.line.noFill = True
+#
+#     speed_charts[i].style = 13
+#     wb.worksheets[0].add_chart(speed_charts[i], "J" + str(i + 1 + 15 * i))
+#
+# wb.save(filename)
 
 # for i in range(5):
 #     ball[i+1] = "Pass # " + str(i + 1) + ":   " + str((targetTimes[i + 1]) / 1000) + " sec  |  " + str(ballSpeeds[i + 1]) + " m/s"
