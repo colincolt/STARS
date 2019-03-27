@@ -3,7 +3,7 @@ from guizero import App, Text, PushButton, Window, Slider, Picture, TextBox, Box
 import include.main_file as main
 import include.launch_test as test
 #import include.stereo_pool as stereo
-from threading import Thread
+from threading import Thread, Event
 import multiprocessing as mp
 import sys
 import time
@@ -14,9 +14,7 @@ close_launch = mp.Event()
 show_camera = mp.Event()
 voice_control = mp.Event()
 drill_not_done = mp.Event()
-
 drill_results = mp.Queue()
-
 
 global startThread
 
@@ -28,57 +26,75 @@ class gui_app():
         self.Launcher = True
         self.Evo = False
 
+        self.left_ball = False
+        self.right_ball = False
 
+
+        self.distance = 5
         self.ballSpeed = 1
         self.difficulty = 1
         self.drillType = "No Drill"
         self.motor_data = "<0,0,0,0,0,0,0>"
-        self.player = "None"
+#        self.player = "None"
 
-    def display_data(self):
-        print("[GUI]: ", self.results)
+    def display_data(self, application):
+        appname = application
+        ball=[0,0,0,0,0,0]
 
-    def START(self, ballSpeed, difficulty, drillType):
+#        print("[GUI]: ", self.results)
+        targetTimes = self.results[0]
+        ballSpeeds = self.results[1]
+#        print(targetTimes,'  ',ballSpeeds)
+        Results = Window(appname, bg="#424242",height=280, width=480, layout="auto")
+        title = Text(Results,str(player)+"'s Results for "+str(self.drillType),size=20,font="Calibri Bold", color="white")
+        subt = "Pass Difficulty: "+str(self.difficulty)+"  |  Ball Speed: "+str(self.ballSpeed)
+        subtitle = Text(Results,subt,size=14,font="Calibri Bold", color="white")
+        spacer = Box(Results,width=20,height=20)
+
+        for i in range(5):
+            ball[i+1] = "Pass # "+str(i+1)+":   "+ str((targetTimes[i+1])/1000)+" sec  |  "+str(ballSpeeds[i+1])+" m/s"
+            Text(Results,ball[i+1],size=12,font="Calibri Bold", color="white")
+
+    def START(self, ballSpeed, difficulty, drillType,appname):
+        appname = appname
+        global player
+        player_name = player
         if pause_event.is_set():
             pause_event.clear()
         if kill_event.is_set():
             kill_event.clear()
         else:
             def StartProgram(ballSpeed, difficulty, drillType):
-                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera,voice_control,drill_results,self.player).run()
+#                print("DIFFICULTY ",difficulty)
+                main.startMainFile(ballSpeed, difficulty, drillType, pause_event, kill_event, self.PitchYaw, self.Launcher, self.Evo, show_camera,voice_control,drill_results,player_name).run()
 
-            def listen_result(self):
+            def listen_result(self, app):
+                application = app
                 no_result=False
                 # print("GUI starting listen thread")
-                while no_result:
+                while not no_result:
                     if kill_event.is_set():
                         no_result=True
                         print("[GUI]: No drill result")
                     try:
-                        self.results = drill_results.get(timeout=0.5)
-                        self.display_data()
+                        self.results = drill_results.get(timeout=2)
+                        self.display_data(application)
                     except:
                         continue
                         # print("[GUI]: Waiting for Result")
                     else:
                         no_result = True
 
-            self.ballSpeed = ballSpeed
-            self.difficulty = difficulty
-            self.drillType = drillType
+            ballSpeed = self.ballSpeed
+            difficulty = self.difficulty
+            drillType = self.drillType
             self.startThread = Thread(target=StartProgram, args=[ballSpeed, difficulty, drillType])
-            self.waitfor_result = Thread(target=listen_result,args=[self])
+            self.waitfor_result = Thread(target=listen_result,args=[self,appname])
 
             if not self.startThread.isAlive():
                 self.startThread.start()
             if not self.waitfor_result.isAlive():
                 self.waitfor_result.start()
-
-            # while drill_not_done.is_set():
-            #     time.sleep(3)
-            #     print("[GUI]: waiting for dill to finish")
-
-
 
     def pause_command(self, sender):
         sender = sender
@@ -110,20 +126,10 @@ class gui_app():
                         thread_not_joined = True
                     except:
                         continue
-
         except:
             print("Leaving before starting drill?")
         finally:
             window.hide()
-
-    def PitchYaw_Only_Cmd(self):
-        self.Launcher = False
-
-    def Launcher_Only_Cmd(self):
-        self.PitchYaw = False
-
-    def No_Evo(self):
-        self.Evo = False
 
     def ball_speed_slider(self, slider_value):
         self.ballSpeed = str(slider_value)
@@ -135,14 +141,15 @@ class gui_app():
 
     def distance_slider(self, slider_value):
         self.distance = str(slider_value)
-        self.motor_data = test.return_data(self.distance)
+        self.motor_data = test.return_data(self.distance,self.left_ball,self.right_ball)
         self.motor_data = self.motor_data.split("_")
         print(self.motor_data)
         self.textbox.value =self.motor_data
 
 
-    def start_command(self, ballSpeed, difficulty, drillType):
-        self.START(ballSpeed, difficulty, drillType)
+    def start_command(self, ballSpeed, difficulty, drillType, application):
+        name = application
+        self.START(ballSpeed, difficulty, drillType, name)
         # print("This is the START command")
 
     def app_exit(self,app):
@@ -163,6 +170,30 @@ class gui_app():
 
         self.StartL = Thread(target=Start_Launch(self.motor_data, close_launch))
         self.StartL.start()
+
+    def left_curve(self):
+        if int(self.distance) <= 8:
+            print("Please select a larger distance")
+        else:
+            if not self.left_ball:
+                self.left_ball = True
+                self.right_ball = False
+            else:
+                print("already set to left curve")
+
+            self.distance_slider(self.distance)
+
+    def right_curve(self):
+        if int(self.distance) <= 8:
+            print("Please select a larger distance")
+        else:
+            if not self.right_ball:
+                self.right_ball = True
+                self.left_ball = False
+            else:
+                print("already set to right curve")
+
+            self.distance_slider(self.distance)
 
     def close_test(self, window):
         close_launch.set()
@@ -189,8 +220,9 @@ class gui_app():
             print("[GUI] : Voice Control enabled")
 
     def player_selection(self, selection):
-        self.player = str(selection)
-        print(self.player)
+        global player
+        player = str(selection)
+        print(player)
 
 
     def staticDrill(self,appname):
@@ -222,7 +254,7 @@ class gui_app():
         difficulty.text_size=14
 
         start = PushButton(self.window1, command=self.start_command,
-                           args=[self.ballSpeed, self.difficulty, self.drillType],
+                           args=[self.ballSpeed, self.difficulty, self.drillType, appname],
                            image="include/images/startbut.png", grid=[1, 5])
         start.bg = "#37f100"
         start.text_color = "white"
@@ -280,7 +312,7 @@ class gui_app():
         difficulty.bg = "white"
         difficulty.text_size=14
 
-        start = PushButton(self.window2, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType],
+        start = PushButton(self.window2, command=self.start_command, args=[self.ballSpeed, self.difficulty, self.drillType, appname],
                            image="include/images/startbut.png", grid=[1, 5])
         start.bg = "#37f100"
         start.text_color = "white"
@@ -305,10 +337,10 @@ class gui_app():
                         image="include/images/micbut.png", align="bottom")
 
 
-
     def manualDrill(self,appname):
         # if self.player != "None":
         from guizero import Box
+        appname = appname
         # second_message.value = "Entering Manual Mode"
         self.drillType = "Manual"
 
@@ -334,7 +366,7 @@ class gui_app():
         difficulty.text_size=14
 
         start = PushButton(self.window3, command=self.start_command,
-                           args=[self.ballSpeed, self.difficulty, self.drillType],
+                           args=[self.ballSpeed, self.difficulty, self.drillType, appname],
                            image="include/images/startbut.png", grid=[1, 5])
         start.bg = "#37f100"
         start.text_color = "white"
@@ -365,26 +397,30 @@ class gui_app():
         appname = appname
         # second_message.value = "User Input Selected"
 
-        self.window4 = Window(app, bg="#424242", height=280, width=480)
+        self.window4 = Window(app, bg="#424242", height=280, width=480,layout="grid")
 
-        Text(self.window4, "User Input Mode", size=18, font="Calibri Bold", color="white")
+        Text(self.window4, "User Input Mode", size=18, font="Calibri Bold", color="white",grid=[1,0])
 
-        Text(self.window4, "Please select a distance:", size=14, font="Calibri Bold", color="white")
-        distance = Slider(self.window4, command=self.distance_slider, start=5, end=25)
+        Text(self.window4, "Please select a distance:", size=14, font="Calibri Bold", color="white",grid=[1,1])
+        distance = Slider(self.window4, command=self.distance_slider, start=5, end=25,grid=[1,2])
         distance.text_size=14
-        Box(self.window4,width=100,height=10)
+        Box(self.window4,width=100,height=10,grid=[1,3])
         distance.bg="white"
-        self.textbox = TextBox(self.window4)
+        self.textbox = TextBox(self.window4,grid=[0,4,3,1])
         self.textbox.width = 40
         self.textbox.bg = "white"
         self.textbox.text_size=14
-        Box(self.window4,width=100,height=10)
+        Box(self.window4,width=100,height=10,grid=[1,5])
 
-        send = PushButton(self.window4, command=self.send_data, args=[], image="include/images/startbut.png")
+        send = PushButton(self.window4, command=self.send_data, args=[], image="include/images/startbut.png",grid=[1,6])
         # send.width = 30
         send.bg="#37f100"
 
-        exit = PushButton(self.window4, command=self.close_test, args=[self.window4], image="include/images/stopbut.png",)
+        left = PushButton(self.window4,command=self.left_curve,args=[],text="Left",grid=[0,6])
+        right = PushButton(self.window4,command=self.right_curve,args=[],text="Right",grid=[2,6])
+
+
+        exit = PushButton(self.window4, command=self.close_test, args=[self.window4], image="include/images/stopbut.png",grid=[1,7])
         exit.bg = "#e9002a"
 
 
@@ -394,10 +430,10 @@ app = App(title="S.T.A.R.S. User Interface", layout="grid", height=280, width=48
 # MainBox = Box(app,grid=[0,0])
 
 welcome_message = Text(app, "Welcome to S.T.A.R.S.", size=20, font="Calibri Bold", color="red", grid=[1,0,2,1])
-player = Combo(app,options=["Player1","Player2","Player3","Player4","Player5"],command=gui_app().player_selection,grid=[1,1,2,1])
-player.bg = "#424242"
-player.text_color = "white"
-player.text_size=14
+player_sel = Combo(app,options=["Player1","Player2","Player3","Player4","Player5"],command=gui_app().player_selection,grid=[1,1,2,1])
+player_sel.bg = "#424242"
+player_sel.text_color = "white"
+player_sel.text_size=14
 Box(app,width=10,height=5,grid=[0,0])
 # second_message = Text(app, "Please select a drill: ", size=14, font="Calibri Bold", color="green",grid=[1,1,2,1])
 # logo = Picture(app, image="include/images/logo.png", align="left", grid=[0,0])
