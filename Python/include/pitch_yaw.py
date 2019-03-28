@@ -143,7 +143,7 @@ SEND to STACKS:
 
         self.replacements = 0
 
-        self.pitchAngleTable = np.array([[7.5, 5],  # << Pitch angle lookup table based on estimations
+        self.pitchAngleTable = np.array([[7.5, 8],  # << Pitch angle lookup table based on estimations
                                          [12.5, 12],
                                          [17.5, 20],
                                          [22.5, 30],
@@ -167,7 +167,8 @@ SEND to STACKS:
             print("error sending reset")
         else:
             self.py_reset_event.clear()
-
+            print("[PitchYaw] : Reset flag cleared")
+            
     def motor_controller(self):
         #        start_time1 = time.time()
         #   ______________________________ PITCH SMOOTHING  ______________________________ #

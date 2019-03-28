@@ -9,7 +9,7 @@ import sys
 
 COLOR = "PINK"
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 if working_on_the_Pi:
     try:
@@ -58,7 +58,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
         hsvLower = (0, 140, 120)
         hsvUpper = (10, 255, 255)
     elif COLOR == "PINK":
-        hsvLower = (160, 60, 60)
+        hsvLower = (160, 80, 100)
         hsvUpper = (170, 255, 255)
 
     frame_width = 1008

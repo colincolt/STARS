@@ -14,7 +14,7 @@ Threads provide no benefit in python for CPU intensive tasks because of the Glob
 HELP:
   '''
 
-working_on_the_Pi = False
+working_on_the_Pi = True
 
 # Packages
 import include.launcher as launcher
@@ -161,6 +161,8 @@ class startMainFile():
         self.py_reset_event = mp.Event()
         self.pymain_stereo_flag = mp.Event()
         self.mega_send_flag = mp.Event()
+        self.launcher_shutdown = mp.Event()
+        self.send_launchdist = mp.Event()
         # *** DATA TUNING PARAMETERS *** #
         self.max_measures = 20
         self.replacements = 0
@@ -184,11 +186,14 @@ class startMainFile():
         self.voice_control = voice_con
         self.results = drill_results
         self.player_choice = player_select
+        self.rationaleDistMeasures = 0
+        self.distanceTotal = 0.0
 
     def shutdown_func(self):
         print("[MainProcess] : EXIT BUTTON PRESSED")
         self.py_reset_event.set()
-        while self.py_reset_event.is_set() and self.processes[1].is_alive():
+        self.launcher_shutdown.set()
+        while self.py_reset_event.is_set() or self.launcher_shutdown.is_set() or self.processes[1].is_alive():
             time.sleep(0.5)
             if self.py_reset_event.is_set():
                 print("[MainFile] : waiting for yaw motor reset 2")
@@ -209,8 +214,42 @@ class startMainFile():
         print("")
         print("Start a new Drill?")
 
+    def get_lidar1(self, stereo_dist):
+        if self.EvoLidar:
+            try:
+                LIDAR_1_Distance = Lidar1Dist(evo)
+                evo.flushOutput()
+                time.sleep(0.05)
+                if LIDAR_1_Distance is not None and abs(stereo_dist - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                    # print("[MainProcess] Evo : ", LIDAR_1_Distance, " meters")
+                    self.rationaleDistMeasures += 1
+                    self.distanceTotal += LIDAR_1_Distance
+            except Exception as w:
+                print("[MainProcess] : LIDAR_1 -> no data" + str(w))
+                pass
+                
+    def get_lidar2(self, stereo_dist):            
+        try:
+            tempData = self.mega_data.get_nowait()
+            tempData = tempData.strip("<")
+            tempData = tempData.strip(">")
+            tempData = tempData.split(",")
+
+            lidar_2_Distance = int(tempData[0])  # lidarDistance = int(cm)
+
+            # print("[MainProcess] Garmin : ", lidar_2_Distance, " meters")
+            if lidar_2_Distance is not None and abs(stereo_dist - lidar_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
+                self.rationaleDistMeasures += 1
+                self.distanceTotal += lidar_2_Distance
+        except Exception as w:
+            print("[MainProcess] : LIDAR_2 -> " ,w)
+            pass
+
+
+
     def get_distances(self):
-        rationaleDistMeasures = 0
+        self.rationaleDistMeasures = 0
+        self.distanceTotal = 0.0
         stereo = False
         while not stereo and not self.kill_event.is_set():
             if self.kill_event.is_set():
@@ -284,9 +323,13 @@ class startMainFile():
                         except Exception as e:
                             print("issue here",e)
                         else:
-                            rationaleDistMeasures = 1.0
-                            distanceTotal = new_distance
-                            FINAL_DIST = float(round(distanceTotal / rationaleDistMeasures, 2))
+                            self.rationaleDistMeasures = 1.0
+                            self.distanceTotal += new_distance
+                            
+                            # self.get_lidar1(new_distance)
+                            # self.get_lidar2(new_distance)
+                            
+                            FINAL_DIST = float(round(self.distanceTotal / self.rationaleDistMeasures, 2))
                             stereo = True
                             # print("[MainFile]: FINAL DISTANCE CALC =  ", FINAL_DIST)
                             return FINAL_DIST
@@ -295,36 +338,6 @@ class startMainFile():
                         return None
                 except:
                     print("[MainFile] : Player is out of range")
-#                else:
-#                    if self.EvoLidar:
-#                        try:
-#                            LIDAR_1_Distance = Lidar1Dist(evo)
-#                            evo.flushOutput()
-#                            time.sleep(0.05)
-#                            if LIDAR_1_Distance is not None and abs(stereo_Distance - LIDAR_1_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-#                                print("[MainProcess] Evo : ", LIDAR_1_Distance, " meters")
-#                                rationaleDistMeasures += 1
-#                                distanceTotal += LIDAR_1_Distance
-#                        except Exception as w:
-#                            # print("[MainProcess] : LIDAR_1 -> no data" + str(w))
-#                            pass
-#                    # Get(NO_WAIT)for LIDAR2 DISTANCE (Run on New Data EVENT() trigger?)  _____________________________
-#                    try:
-#                        tempData = self.mega_data.get_nowait()
-#                        tempData = tempData.strip("<")
-#                        tempData = tempData.strip(">")
-#                        tempData = tempData.split(",")
-#
-#                        lidar_2_Distance = int(tempData[0])  # lidarDistance = int(cm)
-#
-#                        print("[MainProcess] Garmin : ", lidar_2_Distance, " meters")
-#                        if lidar_2_Distance is not None and abs(stereo_Distance - lidar_2_Distance) <= 5:  # <<<<<<USE WEIGHTING FACTOR INSTEAD
-#                            rationaleDistMeasures += 1
-#                            distanceTotal += lidar_2_Distance
-#                    except Exception as w:
-#                        # print("[MainProcess] : LIDAR_2 -> no data" + str(w))
-#                        pass
-
 
     def get_future_dist(self):
         if len(self.distances) == self.max_measures:
@@ -405,7 +418,7 @@ class startMainFile():
         if self.StartLauncher:
             try:
                 Launch = launcher.Launcher(self.guiData, self.mega_data, self.final_dist_l, self.future_dist_l, working_on_the_Pi, WHITE,
-                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control, self.results,self.player_choice)
+                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control, self.results,self.player_choice, self.launcher_shutdown, self.send_launchdist)
                 self.processes.append(Launch)
                 if working_on_the_Pi:
                     RED_3.on()
@@ -477,8 +490,10 @@ class startMainFile():
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
                     current_dist = self.get_distances()
+                    print("[MAINFILE]: NEW: ", current_dist)
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
-                    self.final_dist_l.put(current_dist)
+                    if self.send_launchdist.is_set():
+                        self.final_dist_l.put(current_dist)
                     self.final_dist_py.put(current_dist)
                 except:
                     print("[MainProcess] : Waiting for FINAL distance")
@@ -498,7 +513,6 @@ class startMainFile():
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
                     current_dist = self.get_distances()
-                    # print("NEW: ", current_dist)
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
                     self.final_dist_l.put(current_dist)
                     self.final_dist_py.put(current_dist)
