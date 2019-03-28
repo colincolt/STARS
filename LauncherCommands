@@ -1,0 +1,16 @@
+SWITCH SERVER DISPLAY:
+Switch to 3.5":
+sudo ~/Desktop/Elecrow-LCD35-master/./Elecrow-LCD35
+Switch to HDMI:
+sudo ~/Desktop/Elecrow-LCD35-master/./Elecrow-LCD35 hdmi
+
+START GUI REMOTELY:
+export DISPLAY=:0.0
+python3 ~/Desktop/PROGRAM/gui.py
+
+COPY VIA SSH:
+sudo scp "file" "destination"
+
+UPDATE PI FIRMWARE:
+sudo rpi-update
+
