@@ -9,7 +9,7 @@ from collections import deque
 global import_error
 
 show_camera = Event()
-show_camera.set()
+# show_camera.set()
 try:
     import cv2
     import imutils
@@ -22,18 +22,12 @@ except ImportError as imp:
     print("IMPORTANT  :   WITHOUT OPENCV3.0 THE STEREOSCOPICS WILL NOT OPERATE. " + str(imp))
     import_error = True
 
-# LOCATION OPTIONS ARE:
-# - hall
-# - gym
-# - capstone
-# - capstone pink
-
-LOCATION = "capstone pink"
+COLOR = "PINK"
 
 centroid = (0, 0)
 compvalue = "1.0"
 
-HOST = '169.254.116.12'  # Define the IP address for communication
+HOST = '169.254.167.237'  # Define the IP address for communication
 PORT = 5025
 BUFFER_SIZE = 128
 serverPi = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,30 +40,15 @@ ap.add_argument("-v", "--video", help="path to the (optional) video file")
 ap.add_argument("-b", "--buffer", type=int, default=8, help="max buffer size")
 args = vars(ap.parse_args())
 
-# define the lower and upper boundaries of the jersey ball in the HSV color space, then initialize the list of tracked points
-if LOCATION == "hall":
-    jerseyLower1 = (0, 60, 60)  # currently set for red
-    jerseyUpper1 = (5, 255, 255)
-    jerseyLower2 = (175, 60, 60)  # currently set for red
-    jerseyUpper2 = (180, 255, 255)
+if COLOR == "RED":
+    hsvLower = (175, 50, 50)  # currently set for red
+    hsvUpper = (180, 255, 255)
 
-if LOCATION == "capstone":
-    jerseyLower1 = (0, 50, 50)  # currently set for red
-    jerseyUpper1 = (5, 255, 255)
-    jerseyLower2 = (175, 50, 50)  # currently set for red
-    jerseyUpper2 = (180, 255, 255)
-
-if LOCATION == "capstone pink":
-    jerseyLower = (160, 60, 60)
-    jerseyUpper = (170, 255, 255)
-
-
-if LOCATION == "gym":
-    print("Havent setup yet")
-
+if COLOR == "PINK":
+    hsvLower = (160, 80, 100)
+    hsvUpper = (170, 255, 255)
 
 pts = deque(maxlen=args["buffer"])
-
 
 def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
     while True:
@@ -98,12 +77,7 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
         else:
             blurred = cv2.GaussianBlur(image, (11, 11), 0)
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-            if LOCATION == "capstone pink":
-                mask = cv2.inRange(hsv, jerseyLower, jerseyUpper)
-            else:
-                mask0 = cv2.inRange(hsv, jerseyLower1, jerseyUpper1)
-                mask1 = cv2.inRange(hsv, jerseyLower2, jerseyUpper2)
-                mask = mask0 + mask1
+            mask = cv2.inRange(hsv, hsvLower, hsvUpper)
             mask = cv2.erode(mask, None, iterations=2)
             mask = cv2.dilate(mask, None, iterations=2)
 
@@ -126,7 +100,7 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
                     if radius > 0.5:
                         cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
                         cv2.circle(image, center, 5, (0, 0, 255), -1)
-                    cv2.imshow("Frame", image)  #  mask
+                    cv2.imshow("Frame", mask)  #  mask
                     key = cv2.waitKey(1) & 0xFF
 
                 # Send Data and Sockets Reconnection loop
@@ -184,6 +158,8 @@ class PiVideoStream:
             self.frame = f.array
             self.rawCapture.truncate(0)
 
+            # if the thread indicator variable is set, stop the thread
+            # and resource camera resources
             if self.stopped:
                 self.stream.close()
                 self.rawCapture.close()
