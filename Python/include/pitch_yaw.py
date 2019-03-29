@@ -143,7 +143,8 @@ SEND to STACKS:
 
         self.replacements = 0
 
-        self.pitchAngleTable = np.array([[7.5, 8],  # << Pitch angle lookup table based on estimations
+        self.pitchAngleTable = np.array([[5, 8],
+                                        [7.5, 12],  # << Pitch angle lookup table based on estimations
                                          [12.5, 12],
                                          [17.5, 20],
                                          [22.5, 30],
@@ -191,7 +192,7 @@ SEND to STACKS:
                         new_distance = float(round(self.distances[19] + avg_change, 2))
                         # print(new_distance)
                         self.distances.append(new_distance)
-                        print("replaced ", self.distances)
+#                        print("replaced ", self.distances)
                     # else:
                     #     distances = deque([])
                     #     new_distance = stereo_Distance
@@ -202,20 +203,23 @@ SEND to STACKS:
                 print("populating... ", self.distances)
 
         # ** _________________ PITCH ANGLE: __________________ ** #
-        if new_distance <= 7.5:
+        if new_distance <= 5:
             row = 0
+            pitchAngle = self.pitchAngleTable[row, 1] #+ self.launcherAngle
+        elif new_distance <= 7.5:
+            row = 1
             pitchAngle = self.pitchAngleTable[row, 1]  # + self.launcherAngle
         elif 7.5 < new_distance <= 12.5:
-            row = 1
-            pitchAngle = self.pitchAngleTable[row, 1]
-        elif 12.5 < new_distance <= 17.5:
             row = 2
             pitchAngle = self.pitchAngleTable[row, 1]
-        elif 17.5 < new_distance <= 22.5:
+        elif 12.5 < new_distance <= 17.5:
             row = 3
             pitchAngle = self.pitchAngleTable[row, 1]
-        elif 22.5 < new_distance <= 35:
+        elif 17.5 < new_distance <= 22.5:
             row = 4
+            pitchAngle = self.pitchAngleTable[row, 1]
+        elif 22.5 < new_distance <= 35:
+            row = 5
             pitchAngle = self.pitchAngleTable[row, 1]
         else:
             pitchAngle = 10
@@ -252,28 +256,29 @@ SEND to STACKS:
             self.pixel_disps.append(new_pix)
             print("populating pixel disp: ... ", self.pixel_disps)
 
+        print(new_pix,',')
         # ** ___ SEND DATA ___ ** #
         if self.drillType == "Dynamic":
             drill_type = "1"
 
             ## "PREDICTION" FOR DYNAMIC
-            if self.launch_event.is_set():
-                if self.predictions <= 5:
-                    avg_displacement = sum(self.pixel_disps[9:19]) / 10
-                    if avg_displacement < 0:
-                        new_pix = - 3000
-                    elif avg_displacement > 0:
-                        new_pix = 3000
-                    self.predictions += 1
-                else:
-                    self.launch_event.clear()
-                    self.predictions = 0
+#            if self.launch_event.is_set():
+#                if self.predictions <= 5:
+#                    avg_displacement = sum(self.pixel_disps[9:19]) / 10
+#                    if avg_displacement < 0:
+#                        new_pix = - 3000
+#                    elif avg_displacement > 0:
+#                        new_pix = 3000
+#                    self.predictions += 1
+#                else:
+#                    self.launch_event.clear()
+#                    self.predictions = 0
         else:
             drill_type = "0"
 
         data = '<' + str(new_pix) + ', ' + str(pitchAngle) + ',' + drill_type + '>'
 
-        #        print("[PitchYaw]: UNO Data =  ",data)
+#        print("[PitchYaw]: UNO Data =  ",data)
         if not self.Uno_write_lock.is_set():
             self.UNO.write(data.encode())
 
@@ -399,57 +404,87 @@ SEND to STACKS:
         self.get_stereo()
 
     def dynamic_drill(self):
-        self.futureDist = False
-        finalDist = False
-        while not self.kill_event.is_set():
-            # start_time = time.time()
+        while not self.kill_event.is_set():  # not self.shutdown_event.is_set() and not self.kill_event.is_set():  # <<< BEGINNING OF PITCHYAW LOOP __________ #
+
             self.common_data()
-            try:  # Try for FUT_FINAL_DIST _______________
+
+            try:
+                # Get for FINAL_DIST _______________
                 try:
-                    FUT_FINAL_DIST = self.future_dist_py.get_nowait()
-                    if FUT_FINAL_DIST is not None:
-                        self.futureDist = True
-                    else:
-                        self.futureDist = False
-                # Try for FINAL_DIST from Launcher(Thread) _______________
+                    FINAL_DIST = self.getfinalDistStack.peek()
+                    finalDist = True
                 except:
-                    self.futureDist = False
-                    FUT_FINAL_DIST = None  # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
-                    try:
-                        FINAL_DIST = self.final_dist_py.get_nowait()
-                        if FINAL_DIST is not None:
-                            finalDist = True
-                        else:
-                            finalDist = False
-                    except:
-                        finalDist = False
-                        FINAL_DIST = None  # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
-                        pass
+                    finalDist = False
+                    pass
 
-                # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
-
-                if self.futureDist:  # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
-                    self.usedDistance = FUT_FINAL_DIST
-                    if self.usedDistance > 25.0:
-                        self.usedDistance = 25.0
-                    self.motor_controller()
-                elif finalDist:
+                if finalDist:
                     self.usedDistance = FINAL_DIST
-                    self.motor_controller()
                 else:
-                    try:
-                        self.usedDistance = self.stereoDist
-                        # FPS = time.time() - start_time
-                        self.motor_controller()
-                    except Exception as e:
-                        print(e)
-                        self.shutdown_reset_function()
+                    self.usedDistance = self.stereoDist
+
+                # _________________ APPEND TO THE DISTANCE DEQUE _________________
+                self.dist_deque.appendleft(self.usedDistance)
+                if len(self.dist_deque) > self.avg_measure:
+                    self.dist_deque.pop()
+                # ** ____________________________________________________________________ ** #
+
+                self.motor_controller()  # <<<<<SEND DATA TO MOTORS
 
             except Exception as e:
-                print('[PitchYaw] : exception ', e)
+                print('[PitchYaw] : failed because of exception ', e)
                 continue
-        #            else:
-        #                print("[drill]:  ",1/(time.time() - start_time3))
+
+#        self.futureDist = False
+#        finalDist = False
+#        while not self.kill_event.is_set():
+#            # start_time = time.time()
+#            self.common_data()
+#            try:  # Try for FUT_FINAL_DIST _______________
+#                try:
+#                    FUT_FINAL_DIST = self.future_dist_py.get_nowait()
+#                    if FUT_FINAL_DIST is not None:
+#                        self.futureDist = True
+#                    else:
+#                        self.futureDist = False
+#                # Try for FINAL_DIST from Launcher(Thread) _______________
+#                except:
+#                    self.futureDist = False
+#                    FUT_FINAL_DIST = None  # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
+#                    try:
+#                        FINAL_DIST = self.final_dist_py.get_nowait()
+#                        if FINAL_DIST is not None:
+#                            finalDist = True
+#                        else:
+#                            finalDist = False
+#                    except:
+#                        finalDist = False
+#                        FINAL_DIST = None  # <<<<<<<<<ENSURE THIS ALWAYS GETS A NEW VALUE NEXT ITERATION
+#                        pass
+#
+#                # **________ TWO POSSIBLE CASES: FUTURE_DIST IS AVAILABLE OR NOT ________** #
+#
+#                if self.futureDist:  # << CASE 1: Only have to 'predict'/anticipate future lateral displacement _________
+#                    self.usedDistance = FUT_FINAL_DIST
+#                    if self.usedDistance > 25.0:
+#                        self.usedDistance = 25.0
+#                    self.motor_controller()
+#                elif finalDist:
+#                    self.usedDistance = FINAL_DIST
+#                    self.motor_controller()
+#                else:
+#                    try:
+#                        self.usedDistance = self.stereoDist
+#                        # FPS = time.time() - start_time
+#                        self.motor_controller()
+#                    except Exception as e:
+#                        print(e)
+#                        self.shutdown_reset_function()
+#
+#            except Exception as e:
+#                print('[PitchYaw] : exception ', e)
+#                continue
+#        #            else:
+#        #                print("[drill]:  ",1/(time.time() - start_time3))
 
         if self.kill_event.is_set():
             self.shutdown_reset_function()

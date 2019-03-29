@@ -91,7 +91,7 @@ def MegaData(MEGA, send_flag, send_data, send_mega_main, kill_event, close_event
                         try:
                             data = send_data.pop()
                             MEGA.write(data.encode())
-                            print("[MegaDataThread] : SENT MEGA DATA:  " + data)
+#                            print("[MegaDataThread] : SENT MEGA DATA:  " + data)
                         except serial.SerialException as e:
                             print("[MegaDataThread] : ** MEGA SEND FAILED **   " + str(e))
                             while (time.time() - startTime >= 0.5):
@@ -393,10 +393,11 @@ SEND to STACKS:
         RPM = -1.13635244 * self.used_distance ** 2.0 + 97.7378699 * self.used_distance + 646.034298  # <-- Polynomial fit
         RPS = RPM / 60
         PERIOD = (1 / RPS)* (1000000)
-        
-        if self.used_distance <= 7.5:
-            PERIOD += 25000
-        if 7.5 < self.used_distance <= 12.5:
+        if self.used_distance <= 5:
+            PERIOD = 62500
+        elif self.used_distance <= 7.5:
+            PERIOD += 12500
+        elif 7.5 < self.used_distance <= 12.5:
             PERIOD += 11500
         elif 12.5 < self.used_distance <= 17.5:
             PERIOD += 15000
@@ -407,7 +408,7 @@ SEND to STACKS:
         else:
             print("[Launcher]: Using Default motor formula")
 
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD), "  Distance:  ", self.used_distance)
+#        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD), "  Distance:  ", self.used_distance)
 
         if self.chest_flag.is_set():    ## NEEDS SCALING
             PERIOD = PERIOD
@@ -480,7 +481,7 @@ SEND to STACKS:
 #            if self.ballfeed == "0":
 #                time.sleep(0.2)
             if self.ballfeed == "1":
-                print("[Launcher] : LAUNCHING BALL")
+#                print("[Launcher] : LAUNCHING BALL")
                 self.drillCount += 1  # << ON SUCCESSFUL LAUNCH
                 self.LaunchTime = time.time()
 
@@ -590,7 +591,7 @@ SEND to STACKS:
             while time.time() - warmup < 5 and not future_dist:
                 self.get_distance()
                 #GET NO WAIT FOR FUTURE DISTANCE
-                self.future_distance()
+#                self.future_distance()
                 self.ballfeed = "0"
                 self.send_launch_data()
                 self.get_mega_data()

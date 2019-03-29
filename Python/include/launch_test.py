@@ -15,58 +15,38 @@ def return_data(distance, left_curve, right_curve):
     difficulty = "1"
     ballfeed="1"
 
-    pitchAngleTable = np.array([[7.5, 5],  # << Pitch angle lookup table based on estimations
+    pitchAngleTable = np.array([[5, 8],
+                                [7.5, 12],  # << Pitch angle lookup table based on estimations
                                 [12.5, 12],
                                 [17.5, 20],
                                 [22.5, 30],
                                 [25, 37]])
 
-#    RPM = -1.14 * used_distance ** 2.0 + 98.0 * used_distance + 646.0  # <-- Polynomial fit
-#    RPS = RPM / 60
-#    PERIOD = (1 / RPS)*(1000000) - 3000
-    #motor_speed = round((RPM / 5000) * 255)  # Value between 0-255 (On 24 V: 0-5000 RPM)
-    if used_distance <= 7.5:
-        RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS)*(1000000)
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-
+# ____POLYNOMIAL FIT FROM THEORETICAL VALUES___ #
+    RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
+    RPS = RPM / 60
+    PERIOD = (1 / RPS)* (1000000)
+    if used_distance <= 5:
+        PERIOD = 62500
+    elif used_distance <= 7.5:
+        PERIOD += 12500
     elif 7.5 < used_distance <= 12.5:
-        RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS) * (1000000)+ 11500
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-
-    elif 12.5 < used_distance <=17.5:
-        RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS) * (1000000) +15000
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-
+        PERIOD += 10000
+    elif 12.5 < used_distance <= 17.5:
+        PERIOD += 15000
     elif 17.5 < used_distance <= 22.5:
-        RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS) * (1000000)+10000
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-
+        PERIOD += 13000
     elif 22.5 < used_distance <= 35.0:
-        RPM = -1.13635244 * used_distance ** 2.0 + 97.7378699 * used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS) * (1000000) +2500
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
+        PERIOD += 2500
 
-    else: # << catches and strangeness that may happen to distance reading
-        RPM = -1.13635244 * self.used_distance ** 2.0 + 97.7378699 * self.used_distance + 646.034298  # <-- Polynomial fit
-        RPS = RPM / 60
-        PERIOD = (1 / RPS) * (1000000)
-        print("[Launcher]: RPM: ", int(RPM), "  Period: ", int(PERIOD))
-
+#    if PERIOD >= 63000:
+#         PERIOD = 63000       
     if curve_left:
-        PERIOD1 = PERIOD - 3000
+        PERIOD1 = PERIOD + 8000
         PERIOD2 = PERIOD
     elif curve_right:
         PERIOD1 = PERIOD
-        PERIOD2 = PERIOD - 3000
+        PERIOD2 = PERIOD + 8000
     else:  ## NEEDS SCALING
         PERIOD1 = PERIOD
         PERIOD2 = PERIOD
@@ -74,7 +54,7 @@ def return_data(distance, left_curve, right_curve):
     motor_period1 = str(int(PERIOD1))
     motor_period2 = str(int(PERIOD2))
 
-    targetChoice = int(random.choice([1, 2 , 3, 4]))
+    targetChoice = int(random.choice([1, 2, 3, 4]))
     estimated_tof = (0.120617 * used_distance) * 1000  # + difficulty_time
     estimated_tof = round(estimated_tof, 2)
     # motor_speed = str(int(PERIOD))
@@ -91,20 +71,23 @@ def return_data(distance, left_curve, right_curve):
 #    elif row > 10:
 #        row = 10
 #    pitchAngle = pitchAngleTable[row, 1]
-    if used_distance <= 7.5:
+    if used_distance <= 5:
         row = 0
         pitchAngle = pitchAngleTable[row, 1] #+ self.launcherAngle
-    elif 7.5 < used_distance <= 12.5:
+    elif used_distance <= 7.5:
         row = 1
+        pitchAngle = pitchAngleTable[row, 1] #+ self.launcherAngle
+    elif 7.5 < used_distance <= 12.5:
+        row = 2
         pitchAngle = pitchAngleTable[row, 1]
     elif 12.5 < used_distance <= 17.5:
-        row = 2
+        row = 3
         pitchAngle = pitchAngleTable[row, 1] 
     elif 17.5 < used_distance <= 22.5:
-        row = 3
+        row = 4
         pitchAngle = pitchAngleTable[row, 1]
     elif 22.5 < used_distance <= 35:
-        row = 4
+        row = 5
         pitchAngle = pitchAngleTable[row, 1]
     else:
         pitchAngle = 10
@@ -217,7 +200,7 @@ def launch(MEGA, UNO, Mega_data, Uno_data,close_launch):
     difficulty = "2"
     ballFeed = "1"
     drill_type = "0"
-    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
+#    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
 
     time.sleep(3)
 
@@ -231,9 +214,30 @@ def launch(MEGA, UNO, Mega_data, Uno_data,close_launch):
 
     time.sleep(2)
 
-    wait_for_data(MEGA, close_launch)
+    
+    warmup = time.time()
+    
+    while time.time() - warmup < 4:
+        ballFeed = "0"
+        send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
+        Mega_data = send_data
+        print("Mega Data: ", Mega_data)
+        wait_for_data(MEGA, close_launch)
+        MEGA.write(Mega_data.encode())
+    time.sleep(.2)
+    ballFeed = "1"
+    send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
     Mega_data = send_data
+    wait_for_data(MEGA, close_launch)
     MEGA.write(Mega_data.encode())
+    while time.time() - warmup < 2:
+        ballFeed = "0"
+        send_data = '<' + motor_speed + ',' + motor_speed + ',' + '2' + ','+difficulty +','+ ballFeed +','+ estimated_tof + ','+drill_type+'>'
+        Mega_data = send_data
+        print("Mega Data: ", Mega_data)
+        wait_for_data(MEGA, close_launch)
+        MEGA.write(Mega_data.encode())
+    
     print("Mega Data: ", Mega_data)
     print("launching ball")
     loop_count = 0

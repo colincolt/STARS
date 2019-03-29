@@ -23,6 +23,7 @@ import include.stereo as stereo
 
 try:
     import serial
+    import csv
     import multiprocessing as mp
     import serial.tools.list_ports
     import sys
@@ -289,6 +290,7 @@ class startMainFile():
                             if len(self.distances) == self.max_measures:
                                 moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
 
+                
                                 if abs(new_distance - moving_avgs[15]) <= 2.0:
                                     self.distances.append(new_distance)
                                     self.replacements = 0
@@ -331,7 +333,13 @@ class startMainFile():
                             
                             FINAL_DIST = float(round(self.distanceTotal / self.rationaleDistMeasures, 2))
                             stereo = True
-                            # print("[MainFile]: FINAL DISTANCE CALC =  ", FINAL_DIST)
+#                            print(FINAL_DIST, ",")
+                            myData = [FINAL_DIST,]
+                            myFile = open('/home/pi/Desktop/csvexample.csv', 'a')
+                            with myFile:
+                               writer = csv.writer(myFile)
+                               writer.writerow((myData))
+
                             return FINAL_DIST
                     else:
                         print("[MainFile] stereo_Distance not in range (1-35)")
@@ -490,7 +498,7 @@ class startMainFile():
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
                     current_dist = self.get_distances()
-                    print("[MAINFILE]: NEW: ", current_dist)
+#                    print("[MAINFILE]: NEW: ", current_dist)
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
                     if self.send_launchdist.is_set():
                         self.final_dist_l.put(current_dist)
