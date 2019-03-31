@@ -35,11 +35,6 @@ frame_width = 1008
 frame_height = 256
 resolution = (frame_width, frame_height)
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video", help="path to the (optional) video file")
-ap.add_argument("-b", "--buffer", type=int, default=8, help="max buffer size")
-args = vars(ap.parse_args())
-
 if COLOR == "RED":
     hsvLower = (175, 50, 50)  # currently set for red
     hsvUpper = (180, 255, 255)
@@ -47,8 +42,6 @@ if COLOR == "RED":
 if COLOR == "PINK":
     hsvLower = (160, 80, 100)
     hsvUpper = (170, 255, 255)
-
-pts = deque(maxlen=args["buffer"])
 
 def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
     while True:
@@ -59,21 +52,6 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
             image = imutils.resize(image, width=frame_width, height=frame_height)
         except AttributeError as e:
             print("no image")
-            capture = False
-            while not capture:
-                image = vs.read()
-                image = imutils.resize(image, width=frame_width, height=frame_height)
-                try:
-                    image = vs.read()
-                    image = imutils.resize(image, width=frame_width, height=frame_height)
-                    capture = True
-                except AttributeError as e:
-                    print("no image")
-                    capture = False
-                    continue
-                except:
-                    print("no image")
-                    break
         else:
             blurred = cv2.GaussianBlur(image, (11, 11), 0)
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
@@ -84,7 +62,6 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
             # find contours in the mask and initialize the current (x, y) center of the ball
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
-            center = None
 
             if len(cnts) > 0:
                 c = max(cnts, key=cv2.contourArea)
@@ -103,7 +80,6 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
                     cv2.imshow("Frame", mask)  #  mask
                     key = cv2.waitKey(1) & 0xFF
 
-                # Send Data and Sockets Reconnection loop
                 try:
                     serverPi.send((value).encode())
                     #returndata = serverPi.recv(BUFFER_SIZE)
@@ -121,10 +97,8 @@ def ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi):
                             time.sleep(2)
                         except Exception as e:
                             print("Some exception:  ", e)  # try:
-
                 #FPS = time.time() - start_time
                 #print("FPS: " + str(FPS))
-
             else:
                 print("[StereoClient] : didnt detect anything pink")
 
@@ -185,22 +159,20 @@ def stop(self):
     self.stopped = True
 
 
-# created a *threaded* video stream, allow the camera sensor to warmup,
-# and start the FPS counter
+if __name__ == "__main__":
+    print("[INFO] starting THREADED frames from `picamera` module...")
+    vs = PiVideoStream().start()
+    time.sleep(2.0)
 
-print("[INFO] starting THREADED frames from `picamera` module...")
-vs = PiVideoStream().start()
-time.sleep(2.0)
+    talking = False
+    while not talking:
+        try:
+            serverPi.connect((HOST, PORT))
+            talking = True
+        except:
+            print('Stereoscopics:   No Server')
+            time.sleep(3)
+            continue
+    print('connected to serverpi')
 
-talking = False
-while not talking:
-    try:
-        serverPi.connect((HOST, PORT))
-        talking = True
-    except:
-        print('Stereoscopics:   No Server')
-        time.sleep(3)
-        continue
-print('connected to serverpi')
-
-ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi)
+    ProcessLoop(vs, PORT, BUFFER_SIZE, HOST, serverPi)
