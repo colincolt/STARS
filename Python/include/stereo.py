@@ -9,7 +9,7 @@ import sys
 
 COLOR = "PINK"
 
-working_on_the_Pi = True
+working_on_the_Pi = False
 
 if working_on_the_Pi:
     try:
@@ -66,10 +66,6 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
     framerate = 20
     resolution = (frame_width, frame_height)
 
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-b", "--buffer", type=int, default=8, help="max buffer size")
-    args = vars(ap.parse_args())
-
     def receive_data():
         try:
             data = clientPort.recv(BUFFER_SIZE)
@@ -87,7 +83,7 @@ def Stereoscopics(stereo_data, pi_no_pi, led_color, kill_event, show_camera, pau
 
     def connectClient():
         connected = False
-        while not connected and not kill_event.is_set():  # and not shutdown_event.is_set() and not kill_event.is_set():  # Wait for client
+        while not connected and not kill_event.is_set():
             try:
                 print("[Stereo] Waiting for client")
                 s.bind((TCP_IP, TCP_PORT))

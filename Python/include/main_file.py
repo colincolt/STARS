@@ -14,7 +14,7 @@ Threads provide no benefit in python for CPU intensive tasks because of the Glob
 HELP:
   '''
 
-working_on_the_Pi = True
+working_on_the_Pi = False
 
 # Packages
 import include.launcher as launcher
@@ -23,7 +23,6 @@ import include.stereo as stereo
 
 try:
     import serial
-    import csv
     import multiprocessing as mp
     import serial.tools.list_ports
     import sys
@@ -164,13 +163,17 @@ class startMainFile():
         self.mega_send_flag = mp.Event()
         self.launcher_shutdown = mp.Event()
         self.send_launchdist = mp.Event()
+        self.yaw_boost = mp.Event()
+
+        self.future_flag = mp.Event()
         # *** DATA TUNING PARAMETERS *** #
         self.max_measures = 20
         self.replacements = 0
         self.distances = deque([])
         self.times = deque([])
         self.first_measurement = True
-        self.player_running = False
+        self.player_running = mp.Event()
+        self.got_future_dist = False
         self.processes = []
         # __ GUI Input __ #
         self.guiData = data_object
@@ -189,6 +192,8 @@ class startMainFile():
         self.player_choice = player_select
         self.rationaleDistMeasures = 0
         self.distanceTotal = 0.0
+
+        self.future_distance = 0.0
 
     def shutdown_func(self):
         print("[MainProcess] : EXIT BUTTON PRESSED")
@@ -290,33 +295,41 @@ class startMainFile():
                             if len(self.distances) == self.max_measures:
                                 moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
 
-                
+                                if self.future_flag.is_set():
+                                    looped = 0
+                                    while looped < 15:
+                                        slope1 = moving_avgs[14] - moving_avgs[13]
+                                        slope2 = moving_avgs[15] - moving_avgs[14]
+                                        avg_change = (slope1 + slope2) / 2
+                                        fut_distance = float(round(self.distances[19] + avg_change*4, 2))
+                                        looped += 1
+                                    self.future_distance = fut_distance
+                                    self.got_future_dist = True
+                                    self.future_flag.clear()
+
+                                # DETECT RUNNiNG PLAYER:
+                                if abs(moving_avgs[15] - moving_avgs[0]) > 1.5:
+                                    self.player_running.set()
+                                    print("[Mainfile]: PLAYER IS RUNNING")
+                                    # self.player_speed = (moving_avgs[15] - moving_avgs[0])/sum(self.times[2:17])
+                                # else:
+                                #     self.player_running = False
+
                                 if abs(new_distance - moving_avgs[15]) <= 2.0:
                                     self.distances.append(new_distance)
                                     self.replacements = 0
                                     # print("stereo",self.distances)
-                                    first_new = True
                                 else:
-                                    if first_new:
+                                    self.replacements +=1
+                                    if self.replacements <= 10:
+                                        slope1 = moving_avgs[14] - moving_avgs[13]
+                                        slope2 = moving_avgs[15] - moving_avgs[14]
+                                        avg_change = (slope1 + slope2) / 2
+                                        new_distance = float(round(self.distances[19] + avg_change,2))
+                                        # print(new_distance)
                                         self.distances.append(new_distance)
-                                        # print("2",self.distances)
-                                    else:
-                                        self.replacements +=1
-                                        if self.replacements <= 10:
-                                            slope1 = moving_avgs[14] - moving_avgs[13]
-                                            slope2 = moving_avgs[15] - moving_avgs[14]
-                                            avg_change = (slope1 + slope2) / 2
-                                            new_distance = float(round(self.distances[19] + avg_change,2))
-                                            # print(new_distance)
-                                            self.distances.append(new_distance)
-                                            # print("replaced",self.distances)
+                                        # print("replaced",self.distances)
 
-                                            # DETECT RUNNiNG PLAYER:
-                                            if moving_avgs[15] - moving_avgs[0] > 3:
-                                                self.player_running = True
-                                                self.player_speed = (moving_avgs[15] - moving_avgs[0])/sum(self.times[2:17])
-                                            else:
-                                                self.player_running = False
                                 self.distances.popleft()
                             else:
                                 self.distances.append(new_distance)
@@ -333,27 +346,21 @@ class startMainFile():
                             
                             FINAL_DIST = float(round(self.distanceTotal / self.rationaleDistMeasures, 2))
                             stereo = True
-#                            print(FINAL_DIST, ",")
-                            myData = [FINAL_DIST,]
-                            myFile = open('/home/pi/Desktop/csvexample.csv', 'a')
-                            with myFile:
-                               writer = csv.writer(myFile)
-                               writer.writerow((myData))
-
+                            # print("[MainFile]: FINAL DISTANCE CALC =  ", FINAL_DIST)
                             return FINAL_DIST
                     else:
                         print("[MainFile] stereo_Distance not in range (1-35)")
                         return None
                 except:
-                    print("[MainFile] : Player is out of range")
+                    print("[MainFile] : error in getting Player distance")
 
-    def get_future_dist(self):
-        if len(self.distances) == self.max_measures:
-            moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
-            future_distance = self.distances[19]
-            return future_distance
-        else:
-            return None
+    # def get_future_dist(self):
+    #     if len(self.distances) == self.max_measures:
+    #         moving_avgs = np.convolve(self.distances, np.ones((5)) / 5, mode='valid')
+    #         future_distance = self.distances[19]
+    #         return future_distance
+    #     else:
+    #         return None
 
     def run(self):
 #        print("[MAINFILE]: PLAYER ", self.player_choice)
@@ -414,7 +421,7 @@ class startMainFile():
             try:
                 PitchYaw = pitch_yaw.PitchYaw(self.guiData, self.stereo_data, self.stereo_py_main, self.final_dist_py, self.future_dist_py,
                                               working_on_the_Pi, YELLOW, self.kill_event, self.py_reset_event, self.pause_event, self.data_flag,
-                                              self.pymain_stereo_flag, self.launch_event)
+                                              self.pymain_stereo_flag, self.launch_event,self.yaw_boost)
                 self.processes.append(PitchYaw)
                 if working_on_the_Pi:
                     RED_2.on()
@@ -426,7 +433,7 @@ class startMainFile():
         if self.StartLauncher:
             try:
                 Launch = launcher.Launcher(self.guiData, self.mega_data, self.final_dist_l, self.future_dist_l, working_on_the_Pi, WHITE,
-                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control, self.results,self.player_choice, self.launcher_shutdown, self.send_launchdist)
+                                           self.kill_event, self.pause_event, self.py_reset_event, self.launch_event, self.voice_control, self.results,self.player_choice, self.launcher_shutdown, self.send_launchdist,self.future_flag,self.yaw_boost,self.player_running)
                 self.processes.append(Launch)
                 if working_on_the_Pi:
                     RED_3.on()
@@ -478,11 +485,12 @@ class startMainFile():
                     continue
                 else:
                     # _______________________ FUTURE DISTANCE PREDICTION FOR DYNAMIC _______________________ #
-                    if current_dist and self.player_running:
-                        future_distance = self.get_future_dist()
+                    if self.got_future_dist:
+                        # future_distance = self.get_future_dist()
                         # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
-                        self.future_dist_l.put(future_distance)
-                        self.future_dist_py.put(future_distance)
+                        self.future_dist_l.put(self.future_distance)
+                        self.got_future_dist = False
+                        # self.future_dist_py.put(self.future_distance)
 
 # _________________ BASIC TRACKING DRILL _________________  #
             elif self.guiData.drilltype == "Static":
@@ -498,7 +506,7 @@ class startMainFile():
                 try:
                     # _______________________ FINAL AVERAGED DISTANCE (STEREO + LIDAR1 + LIDAR2) _______________________ #
                     current_dist = self.get_distances()
-#                    print("[MAINFILE]: NEW: ", current_dist)
+                    # print("[MAINFILE]: NEW: ", current_dist)
                     # SEND THIS TO PITCHYAW AND THE LAUNCHER PROCESS
                     if self.send_launchdist.is_set():
                         self.final_dist_l.put(current_dist)
